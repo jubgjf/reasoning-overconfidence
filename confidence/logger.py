@@ -1,0 +1,82 @@
+from typing import Type
+
+from loguru import logger
+from pydantic.fields import FieldInfo
+from tortoise import Tortoise, fields
+from tortoise.models import Model as TortoiseModel
+
+from confidence.data import IRecord
+
+TableClass: Type[TortoiseModel]
+
+
+def _make_tabel_cls(record_cls: Type[IRecord], table_name: str):
+    table_columns = {}
+
+    for name, field_info in record_cls.model_fields.items():
+        name: str
+        field_info: FieldInfo
+        field_type = field_info.annotation
+
+        if field_type == int:
+            if name == "id":
+                table_columns[name] = fields.IntField(primary_key=True)
+            else:
+                table_columns[name] = fields.IntField()
+        elif field_type == float:
+            table_columns[name] = fields.FloatField()
+        elif field_type == str:
+            if name == "id":
+                table_columns[name] = fields.CharField(max_length=100000, primary_key=True)
+            else:
+                table_columns[name] = fields.CharField(max_length=100000)
+        elif field_type == dict or field_type == dict[str, str]:
+            table_columns[name] = fields.JSONField()
+        else:
+            raise TypeError(f"Unsupported field type {field_type} for {name} ({type(name)})")
+
+    table_columns["Meta"] = type("Meta", (), {"table": table_name})
+    global TableClass  # TODO: Bad code, but assign to self._table_cls is not working
+    TableClass = type(f"{record_cls.__name__}Table", (TortoiseModel,), table_columns)
+
+
+class Logger:
+    def __init__(
+        self,
+        db_name: str,
+        table_name: str,
+        record_cls: Type[IRecord],
+        force_update: bool = False,
+    ):
+        self._db_name = db_name
+        self._db_url = f"sqlite://logs/{self._db_name}.db"
+
+        _make_tabel_cls(record_cls, table_name)
+
+        self._force_update = force_update
+
+        logger.info(f"Logging into {self._db_url}::{table_name}")
+
+    async def __aenter__(self):
+        await Tortoise.init(db_url=self._db_url, modules={"models": ["confidence.logger"]})
+        await Tortoise.generate_schemas()
+        if self._force_update:
+            logger.warning(f"force_update is True, deleting all records in {TableClass.Meta.table}")
+            await TableClass.all().delete()
+
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        # Auto clean-up by `tortoise.run_async()`
+        ...
+
+    async def insert(self, record: IRecord):
+        global TableClass
+        await TableClass.update_or_create(**record.model_dump())
+
+    async def fetch(self):
+        global TableClass
+        await TableClass.all()
+
+    async def already_processed_ids(self) -> list[int]:
+        global TableClass
+        records = await TableClass.all().values("id")
+        return [record["id"] for record in records]
