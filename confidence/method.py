@@ -238,7 +238,8 @@ class Method:
             logprobs_unnormalized = {"0": float("-inf"), "1": float("-inf")}
             for top_token in confidence_token.top_logprobs:
                 if top_token.token.strip() in logprobs_unnormalized.keys():
-                    logprobs_unnormalized[top_token.token.strip()] = math.exp(top_token.logprob)
+                    logprobs_unnormalized[top_token.token.strip()] = top_token.logprob
+            logprobs_unnormalized = {k: math.exp(v) for k, v in logprobs_unnormalized.items()}
             logprobs_normalized = {k: v / sum(logprobs_unnormalized.values()) for k, v in logprobs_unnormalized.items()}
             return Ok((extracted_answer, logprobs_normalized["1"]))
         else:
