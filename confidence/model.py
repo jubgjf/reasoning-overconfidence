@@ -12,6 +12,10 @@ from result import Err, Ok, Result
 
 class ModelName(Enum):
     QWEN2_5_7B = "qwen2.5-7b"
+    QWEN2_5_72B = "qwen2.5-72b"
+    LLAMA3_3_70B = "llama3.3-70b"
+    QWQ_32B = "qwq-32b"
+    DEEPSEEK_R1 = "deepseek-r1-250120"
 
     def __str__(self) -> str:
         return self.value
