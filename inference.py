@@ -6,22 +6,12 @@ from tap import Tap
 from tortoise import run_async
 from tqdm.auto import tqdm
 
-from confidence.data import Data, Template, GSM8KTemplate, ARCTemplate
+from confidence.data import Data, Template, GSM8KTemplate, ARCTemplate, string_to_template
 from confidence.dataset import DatasetName
 from confidence.logger import Logger
 from confidence.method import MethodName, Method, Response
 from confidence.model import Model, ModelName
 from confidence.utils import limit_concurrency, list_history_to_dict
-
-
-def to_template(string: str) -> GSM8KTemplate | ARCTemplate:
-    for t in GSM8KTemplate:
-        if t.value == string:
-            return t
-    for t in ARCTemplate:
-        if t.value == string:
-            return t
-    raise ValueError(f"Unknown template: {string}")
 
 
 class Argument(Tap):
@@ -35,10 +25,11 @@ class Argument(Tap):
     # method: MethodName = MethodName.P_True
     max_samples: int | None = None
     force_update: bool = False
-    concurrency: int = 200
+    concurrency: int = 100
+    debug: bool = False
 
     def configure(self) -> None:
-        self.add_argument("--template", type=to_template)
+        self.add_argument("--template", type=string_to_template)
 
 
 async def request(method: Method, model: Model, template: Template, data: Data) -> tuple[str, Result[Response, str]]:
@@ -49,7 +40,7 @@ async def request(method: Method, model: Model, template: Template, data: Data) 
 async def main(args: Argument):
     record_cls = args.dataset.record_cls
     db_logger = Logger(
-        db_name=args.dataset.value,
+        db_name=args.dataset.value if not args.debug else "debug",
         table_name=f"{args.dataset}--{args.method}--{args.template}--{args.model}",
         record_cls=record_cls,
         force_update=args.force_update,
@@ -80,7 +71,11 @@ async def main(args: Argument):
         tasks = [request(method=method, model=model, template=args.template, data=data) for data in dataset]
         tasks = limit_concurrency(tasks, args.concurrency)
 
-        async for zip_response in tqdm(asyncio.as_completed(tasks), total=len(tasks), desc="Inference"):
+        async for zip_response in tqdm(
+            asyncio.as_completed(tasks),
+            total=len(tasks),
+            desc=f"{args.dataset}--{args.method}--{args.template}--{args.model}",
+        ):
             data: Data
             response_result: Result[Response, str]
             data, response_result = await zip_response

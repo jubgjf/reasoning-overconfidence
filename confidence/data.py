@@ -89,6 +89,16 @@ class ARCTemplate(ITemplate):
 Template = TypeVar("Template", GSM8KTemplate, ARCTemplate)
 
 
+def string_to_template(string: str) -> GSM8KTemplate | ARCTemplate:
+    for t in GSM8KTemplate:
+        if t.value == string:
+            return t
+    for t in ARCTemplate:
+        if t.value == string:
+            return t
+    raise ValueError(f"Unknown template: {string}")
+
+
 class IRecord(ABC, BaseModel):
     model_answer_response: str
     model_answer_extracted: str
