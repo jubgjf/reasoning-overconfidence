@@ -3,6 +3,7 @@ from typing import Type
 from loguru import logger
 from pydantic.fields import FieldInfo
 from tortoise import Tortoise, fields
+from tortoise.contrib.pydantic import pydantic_queryset_creator
 from tortoise.models import Model as TortoiseModel
 
 from confidence.data import IRecord
@@ -51,11 +52,13 @@ class Logger:
         self._db_name = db_name
         self._db_url = f"sqlite://logs/{self._db_name}.db"
 
-        _make_tabel_cls(record_cls, table_name)
+        self._record_cls = record_cls
+        _make_tabel_cls(self._record_cls, table_name)
+        self._orm2pydantic = pydantic_queryset_creator(TableClass)
 
         self._force_update = force_update
 
-        logger.info(f"Logging into {self._db_url}::{table_name}")
+        logger.info(f"Logging url: {self._db_url}::{table_name}")
 
     async def __aenter__(self):
         await Tortoise.init(db_url=self._db_url, modules={"models": ["confidence.logger"]})
@@ -72,9 +75,10 @@ class Logger:
         global TableClass
         await TableClass.update_or_create(**record.model_dump())
 
-    async def fetch(self):
+    async def fetch(self) -> list[IRecord]:
         global TableClass
-        await TableClass.all()
+        records = await self._orm2pydantic.from_queryset(TableClass.all())
+        return [self._record_cls(**r) for r in records.model_dump()]
 
     async def already_processed_ids(self) -> list[int]:
         global TableClass
