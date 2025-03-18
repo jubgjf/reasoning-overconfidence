@@ -75,6 +75,7 @@ class GSM8KTemplate(ITemplate):
 
 class ARCTemplate(ITemplate):
     OpenCompass = "opencompass"
+    OpenCompassCoT = "opencompass-cot"
 
     def prompt(self, data: "ARCData") -> str:
         if self == self.OpenCompass:
@@ -82,6 +83,14 @@ class ARCTemplate(ITemplate):
             return (
                 f"Question: {data.question}\n" + "\n".join([f"{k}. {v}" for k, v in data.choices.items()]) + "\nAnswer:"
             )
+        elif self == self.OpenCompassCoT:
+            # https://github.com/open-compass/opencompass/blob/277d7946f5ac314138b8c30e985ebde87552e474/opencompass/configs/datasets/ARC_c/ARC_c_cot_gen_926652.py#L8
+            return (
+                "Answer the following multiple choice question. The last line of your response should be of the following format: 'ANSWER: $LETTER' (without quotes) where LETTER is one of ABCD. Think step by step before answering.\n"
+                "\n"
+                f"{data.question}\n"
+                "\n"
+            ) + "\n".join([f"{k}. {v}" for k, v in data.choices.items()])
         else:
             assert_never(self)
 
