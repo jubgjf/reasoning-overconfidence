@@ -7,12 +7,13 @@ from typing import Type, assert_never
 from pydantic import BaseModel
 from typing_extensions import TypeVar
 
-from .data import Data, GSM8KData, ARCData, Record, GSM8KRecord, ARCRecord
+from .data import Data, GSM8KData, ARCData, Record, GSM8KRecord, ARCRecord, LogiQARecord, LogiQAData
 
 
 class DatasetName(Enum):
     GSM8K = "gsm8k"
     ARC = "arc"
+    LogiQA = "logiqa"
 
     def __str__(self) -> str:
         return self.value
@@ -23,6 +24,8 @@ class DatasetName(Enum):
             return GSM8KRecord
         elif self == self.ARC:
             return ARCRecord
+        elif self == self.LogiQA:
+            return LogiQARecord
         else:
             assert_never(self)
 
@@ -32,6 +35,8 @@ class DatasetName(Enum):
             return GSM8KDataset
         elif self == self.ARC:
             return ARCDataset
+        elif self == self.LogiQA:
+            return LogiQADataset
         else:
             assert_never(self)
 
@@ -81,4 +86,14 @@ class ARCDataset(IDataset):
         return ARCData
 
 
-Dataset = TypeVar("Dataset", GSM8KDataset, ARCDataset)
+class LogiQADataset(IDataset):
+    @property
+    def _name(self) -> DatasetName:
+        return DatasetName.LogiQA
+
+    @property
+    def _data_cls(self) -> Type[Data]:
+        return LogiQAData
+
+
+Dataset = TypeVar("Dataset", GSM8KDataset, ARCDataset, LogiQADataset)
