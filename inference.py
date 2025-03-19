@@ -6,7 +6,7 @@ from tap import Tap
 from tortoise import run_async
 from tqdm.auto import tqdm
 
-from confidence.data import Data, Template, GSM8KTemplate, ARCTemplate, string_to_template
+from confidence.data import Data, Template, GSM8KTemplate, ARCTemplate, string_to_template, LogiQATemplate
 from confidence.dataset import DatasetName
 from confidence.logger import Logger
 from confidence.method import MethodName, Method, Response

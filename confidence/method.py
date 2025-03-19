@@ -100,7 +100,7 @@ class Method:
                 if extracted_result.is_err():
                     return extracted_result
                 extracted_answer, _, _ = extracted_result.ok_value
-            elif dataset_name == DatasetName.ARC:
+            elif dataset_name in [DatasetName.ARC, DatasetName.LogiQA]:
                 extracted_result = first_option_postprocess(answer_response)
                 if extracted_result.is_err():
                     return extracted_result
@@ -162,7 +162,7 @@ class Method:
                     k: v / sum(logprobs_unnormalized.values()) for k, v in logprobs_unnormalized.items()
                 }
                 return Ok((extracted_answer, logprobs_normalized[extracted_answer]))
-            elif dataset_name == DatasetName.ARC:
+            elif dataset_name in [DatasetName.ARC, DatasetName.LogiQA]:
                 answer_response_from_tokens = "".join([t.token for t in logprobs]).rstrip("<|im_end|>")
                 if answer_response.strip() != answer_response_from_tokens.strip():
                     # Sometimes Unicode chars are divided into multiple tokens, so len(tokens) may not match len(answer)
@@ -210,7 +210,7 @@ class Method:
                 if extracted_result.is_err():
                     return extracted_result
                 extracted_answer, _, _ = extracted_result.ok_value
-            elif dataset_name == DatasetName.ARC:
+            elif dataset_name in [DatasetName.ARC, DatasetName.LogiQA]:
                 extracted_result = first_option_postprocess(answer_response)
                 if extracted_result.is_err():
                     return extracted_result

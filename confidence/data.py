@@ -25,7 +25,15 @@ class ARCData(IData):
     answer_key: str
 
 
-Data = TypeVar("Data", GSM8KData, ARCData)
+class LogiQAData(IData):
+    id: int
+    passage: str
+    question: str
+    choices: dict[str, str]
+    answer_key: str
+
+
+Data = TypeVar("Data", GSM8KData, ARCData, LogiQAData)
 
 
 class ITemplate(ABC, Enum, metaclass=ABCEnumMeta):
@@ -95,14 +103,47 @@ class ARCTemplate(ITemplate):
             assert_never(self)
 
 
-Template = TypeVar("Template", GSM8KTemplate, ARCTemplate)
+class LogiQATemplate(ITemplate):
+    CoTEval = "coteval"
+    CoTEvalCoT = "coteval-cot"
+
+    def prompt(self, data: "LogiQAData") -> str:
+        if self == self.CoTEval:
+            # https://github.com/logikon-ai/cot-eval/blob/5df942c22f4222fe449ac9e413ce5c318f3af08d/eleuther/tasks/logikon/utils_logikon.py#L2
+            return (
+                (
+                    "Answer the following question about the given passage.\n\n"
+                    f"Passage: {data.passage}\n\n"
+                    f"Question: {data.question}\n"
+                )
+                + "\n".join([f"{k}. {v}" for k, v in data.choices.items()])
+                + "\nAnswer:"
+            )
+        elif self == self.CoTEvalCoT:
+            return (
+                (
+                    "Answer the following question about the given passage. Think step by step before answering.\n\n"
+                    f"Passage: {data.passage}\n\n"
+                    f"Question: {data.question}\n"
+                )
+                + "\n".join([f"{k}. {v}" for k, v in data.choices.items()])
+                + "\nAnswer:"
+            )
+        else:
+            assert_never(self)
 
 
-def string_to_template(string: str) -> GSM8KTemplate | ARCTemplate:
+Template = TypeVar("Template", GSM8KTemplate, ARCTemplate, LogiQATemplate)
+
+
+def string_to_template(string: str) -> GSM8KTemplate | ARCTemplate | LogiQATemplate:
     for t in GSM8KTemplate:
         if t.value == string:
             return t
     for t in ARCTemplate:
+        if t.value == string:
+            return t
+    for t in LogiQATemplate:
         if t.value == string:
             return t
     raise ValueError(f"Unknown template: {string}")
@@ -125,4 +166,7 @@ class GSM8KRecord(IRecord, GSM8KData): ...
 class ARCRecord(IRecord, ARCData): ...
 
 
-Record = TypeVar("Record", GSM8KRecord, ARCRecord)
+class LogiQARecord(IRecord, LogiQAData): ...
+
+
+Record = TypeVar("Record", GSM8KRecord, ARCRecord, LogiQARecord)
