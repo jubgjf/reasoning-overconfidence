@@ -6,20 +6,19 @@ from tap import Tap
 from tortoise import run_async
 from tqdm.auto import tqdm
 
-from confidence.data import Data, Template, GSM8KTemplate, ARCTemplate, string_to_template, LogiQATemplate
+from confidence.data import Data
 from confidence.dataset import DatasetName
-from confidence.logger import Logger
+from confidence.logger import Logger, list_history_to_dict
 from confidence.method import MethodName, Method, Response
 from confidence.model import Model, ModelName
-from confidence.utils import limit_concurrency, list_history_to_dict
+from confidence.template import GSM8KTemplate, ARCTemplate, LogiQATemplate, Template, string_to_template
+from confidence.utils import limit_concurrency
 
 
 class Argument(Tap):
     model: ModelName = ModelName.QWEN2_5_7B
     dataset: DatasetName = DatasetName.GSM8K
-    template: GSM8KTemplate | ARCTemplate = GSM8KTemplate.BigGSM
-    # dataset: DatasetName = DatasetName.ARC
-    # template: GSM8KTemplate | ARCTemplate = ARCTemplate.OpenCompass
+    template: GSM8KTemplate | ARCTemplate | LogiQATemplate = GSM8KTemplate.BigGSM
     method: MethodName = MethodName.Verbal_0_100
     # method: MethodName = MethodName.LogProb
     # method: MethodName = MethodName.P_True

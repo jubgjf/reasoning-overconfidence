@@ -9,7 +9,8 @@ from openai.types.chat import ChatCompletionTokenLogprob
 from pydantic import BaseModel
 from result import Result, Ok, Err
 
-from .data import Template, Data
+from .data import Data
+from .template import Template
 from .dataset import DatasetName
 from .model import Model
 from .utils import first_option_postprocess, gsm8k_postprocess

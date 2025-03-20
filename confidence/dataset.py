@@ -7,7 +7,8 @@ from typing import Type, assert_never
 from pydantic import BaseModel
 from typing_extensions import TypeVar
 
-from .data import Data, GSM8KData, ARCData, Record, GSM8KRecord, ARCRecord, LogiQARecord, LogiQAData
+from .data import Data, GSM8KData, ARCData, LogiQAData
+from .logger import GSM8KRecord, ARCRecord, LogiQARecord, Record
 
 
 class DatasetName(Enum):

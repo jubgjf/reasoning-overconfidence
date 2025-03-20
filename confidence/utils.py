@@ -15,13 +15,6 @@ def limit_concurrency(coroutines: Sequence[Coroutine], concurrency: int) -> list
     return [with_concurrency_limit(coroutine) for coroutine in coroutines]
 
 
-def list_history_to_dict(history: list[dict[str, str]]) -> dict[str, str]:
-    dict_history = {}
-    for i, turn in enumerate(history):
-        dict_history[f"{turn['role']}_{i // 2}"] = turn["content"]
-    return dict_history
-
-
 def gsm8k_postprocess(text: str) -> Result[tuple[str, int, int], str]:
     # pattern is from https://github.com/open-compass/opencompass/blob/854c6bf025ed53e332ae58a7ee66807eae48618d/opencompass/datasets/gsm8k.py#L44
     pattern = r"-?\d+\.\d+|-?\d+"
