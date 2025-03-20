@@ -1,6 +1,7 @@
 import asyncio
 import os
 from enum import Enum
+from typing import assert_never
 
 from dotenv import load_dotenv
 from loguru import logger
@@ -16,6 +17,7 @@ class ModelName(Enum):
     LLAMA3_3_70B = "llama3.3-70b"
     QWQ_32B = "qwq-32b"
     DEEPSEEK_R1 = "deepseek-r1-250120"
+    DEEPSEEK_R1_DISTILL_QWEN2_5_MATH_7B = "dsr1-distill-qwen2.5-math-7b"
 
     def __str__(self) -> str:
         return self.value
@@ -23,6 +25,23 @@ class ModelName(Enum):
     @property
     def model_id(self) -> str:
         return self.value
+
+    @property
+    def hf_name(self) -> str:
+        if self == ModelName.QWEN2_5_7B:
+            return "Qwen/Qwen2.5-7B-Instruct"
+        elif self == ModelName.QWEN2_5_72B:
+            return "Qwen/Qwen2.5-72B-Instruct"
+        elif self == ModelName.LLAMA3_3_70B:
+            return "meta-llama/Llama-3.3-70B-Instruct"
+        elif self == ModelName.QWQ_32B:
+            return "Qwen/QwQ-32B"
+        elif self == ModelName.DEEPSEEK_R1:
+            return "deepseek-ai/DeepSeek-R1"
+        elif self == ModelName.DEEPSEEK_R1_DISTILL_QWEN2_5_MATH_7B:
+            return "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"
+        else:
+            assert_never(self)
 
 
 class APIResponse(BaseModel):

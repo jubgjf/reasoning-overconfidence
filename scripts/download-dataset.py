@@ -1,13 +1,12 @@
 import os
 
-from confidence.utils import gsm8k_postprocess
-
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 
 from pathlib import Path
 
 from datasets import load_dataset
-from confidence.data import GSM8KData, ARCData
+from confidence.data import GSM8KData, ARCData, LogiQAData
+from confidence.utils import gsm8k_postprocess
 
 if __name__ == "__main__":
     dataset = load_dataset("openai/gsm8k", "main", split="test")
@@ -39,5 +38,20 @@ if __name__ == "__main__":
                 question=data["question"],
                 choices={k: v for k, v in zip(data["choices"]["label"], data["choices"]["text"])},
                 answer_key=data["answerKey"],
+            )
+            f.write(data.model_dump_json() + "\n")
+
+    dataset = load_dataset("logikon/logikon-bench", name="logiqa", split="test")
+    save_to = Path("./dataset/logiqa.jsonl")
+    if not save_to.exists():
+        save_to.parent.mkdir(exist_ok=True)
+    with open(save_to, "w") as f:
+        for i, data in enumerate(dataset):
+            data = LogiQAData(
+                id=i,
+                passage=data["passage"],
+                question=data["question"],
+                choices={k: v for k, v in zip(["A", "B", "C", "D"], data["options"])},
+                answer_key=["A", "B", "C", "D"][data["answer"]],
             )
             f.write(data.model_dump_json() + "\n")
