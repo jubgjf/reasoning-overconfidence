@@ -8,7 +8,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from transformers import AutoTokenizer
 from tortoise import run_async
-from confidence.data import GSM8KTemplate, LogiQATemplate, ARCTemplate
+from confidence.template import GSM8KTemplate, ARCTemplate, LogiQATemplate
 from confidence.dataset import DatasetName
 from confidence.logger import Logger
 from confidence.method import MethodName

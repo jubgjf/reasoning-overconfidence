@@ -3,7 +3,7 @@ import pandas as pd
 import seaborn as sns
 from tortoise import run_async
 
-from confidence.data import LogiQATemplate
+from confidence.template import LogiQATemplate
 from confidence.dataset import DatasetName
 from confidence.logger import Logger
 from confidence.method import MethodName

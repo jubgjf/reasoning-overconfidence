@@ -1,14 +1,34 @@
-from typing import Type
+from abc import ABC
+from typing import Type, TypeVar
 
 from loguru import logger
+from pydantic import BaseModel
 from pydantic.fields import FieldInfo
 from tortoise import Tortoise, fields
 from tortoise.contrib.pydantic import pydantic_queryset_creator
 from tortoise.models import Model as TortoiseModel
 
-from confidence.data import IRecord
+from confidence.data import GSM8KData, ARCData, LogiQAData
 
 TableClass: Type[TortoiseModel]
+
+
+class IRecord(ABC, BaseModel):
+    model_answer_response: str
+    model_answer_extracted: str
+    model_confidence_response: str
+    model_confidence_extracted: float
+    template: str
+    method: str
+    history: dict  # dict[str, str]
+    model: str
+
+
+def list_history_to_dict(history: list[dict[str, str]]) -> dict[str, str]:
+    dict_history = {}
+    for i, turn in enumerate(history):
+        dict_history[f"{turn['role']}_{i // 2}"] = turn["content"]
+    return dict_history
 
 
 def _make_tabel_cls(record_cls: Type[IRecord], table_name: str):
@@ -84,3 +104,15 @@ class Logger:
         global TableClass
         records = await TableClass.all().values("id")
         return [record["id"] for record in records]
+
+
+class GSM8KRecord(IRecord, GSM8KData): ...
+
+
+class ARCRecord(IRecord, ARCData): ...
+
+
+class LogiQARecord(IRecord, LogiQAData): ...
+
+
+Record = TypeVar("Record", GSM8KRecord, ARCRecord, LogiQARecord)
