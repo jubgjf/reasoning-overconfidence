@@ -8,7 +8,7 @@ from tortoise import Tortoise, fields
 from tortoise.contrib.pydantic import pydantic_queryset_creator
 from tortoise.models import Model as TortoiseModel
 
-from confidence.data import GSM8KData, ARCData, LogiQAData
+from confidence.data import ARCData, GAOKAOData, GSM8KData, LogiQAData
 
 TableClass: Type[TortoiseModel]
 
@@ -115,4 +115,7 @@ class ARCRecord(IRecord, ARCData): ...
 class LogiQARecord(IRecord, LogiQAData): ...
 
 
-Record = TypeVar("Record", GSM8KRecord, ARCRecord, LogiQARecord)
+class GAOKAORecord(IRecord, GAOKAOData): ...
+
+
+Record = TypeVar("Record", GSM8KRecord, ARCRecord, LogiQARecord, GAOKAORecord)

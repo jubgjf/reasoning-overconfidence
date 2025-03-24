@@ -2,44 +2,44 @@ import json
 from abc import ABC, abstractmethod
 from enum import Enum
 from pathlib import Path
-from typing import Type, assert_never
+from typing import Type
 
 from pydantic import BaseModel
 from typing_extensions import TypeVar
 
-from .data import Data, GSM8KData, ARCData, LogiQAData
-from .logger import GSM8KRecord, ARCRecord, LogiQARecord, Record
+from .data import Data, GSM8KData, ARCData, LogiQAData, GAOKAOData
+from .logger import GSM8KRecord, ARCRecord, LogiQARecord, GAOKAORecord, Record
 
 
 class DatasetName(Enum):
     GSM8K = "gsm8k"
     ARC = "arc"
     LogiQA = "logiqa"
+    GAOKAO_Physics = "gaokao_physics"
+    # GPQA_Diamond = "gpqa_diamond"  # TODO
 
     def __str__(self) -> str:
         return self.value
 
     @property
     def record_cls(self) -> Type[Record]:
-        if self == self.GSM8K:
-            return GSM8KRecord
-        elif self == self.ARC:
-            return ARCRecord
-        elif self == self.LogiQA:
-            return LogiQARecord
-        else:
-            assert_never(self)
+        record_cls_map = {
+            DatasetName.GSM8K: GSM8KRecord,
+            DatasetName.ARC: ARCRecord,
+            DatasetName.LogiQA: LogiQARecord,
+            DatasetName.GAOKAO_Physics: GAOKAORecord,
+        }
+        return record_cls_map[self]
 
     @property
     def dataset_cls(self) -> Type["Dataset"]:
-        if self == self.GSM8K:
-            return GSM8KDataset
-        elif self == self.ARC:
-            return ARCDataset
-        elif self == self.LogiQA:
-            return LogiQADataset
-        else:
-            assert_never(self)
+        dataset_cls_map = {
+            DatasetName.GSM8K: GSM8KDataset,
+            DatasetName.ARC: ARCDataset,
+            DatasetName.LogiQA: LogiQADataset,
+            DatasetName.GAOKAO_Physics: GAOKAODataset,
+        }
+        return dataset_cls_map[self]
 
 
 class IDataset(BaseModel, ABC):
@@ -97,4 +97,14 @@ class LogiQADataset(IDataset):
         return LogiQAData
 
 
-Dataset = TypeVar("Dataset", GSM8KDataset, ARCDataset, LogiQADataset)
+class GAOKAODataset(IDataset):
+    @property
+    def _name(self) -> DatasetName:
+        return DatasetName.GAOKAO_Physics
+
+    @property
+    def _data_cls(self) -> Type[Data]:
+        return GAOKAOData
+
+
+Dataset = TypeVar("Dataset", GSM8KDataset, ARCDataset, LogiQADataset, GAOKAODataset)

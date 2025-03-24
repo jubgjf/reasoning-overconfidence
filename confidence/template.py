@@ -1,8 +1,8 @@
-from abc import ABCMeta, ABC, abstractmethod
-from enum import EnumMeta, Enum
-from typing import Type, assert_never, TypeVar
+from abc import ABC, ABCMeta, abstractmethod
+from enum import Enum, EnumMeta
+from typing import Type, TypeVar, assert_never
 
-from confidence.data import Data, GSM8KData, ARCData, LogiQAData
+from .data import ARCData, Data, GAOKAOData, GSM8KData, LogiQAData
 
 
 class ABCEnumMeta(ABCMeta, EnumMeta): ...
@@ -13,13 +13,13 @@ class ITemplate(ABC, Enum, metaclass=ABCEnumMeta):
         return self.value
 
     @abstractmethod
-    def prompt(self, data_fields: Type[Data]) -> str: ...
+    def prompt(self, data: Type[Data]) -> str: ...
 
 
 class GSM8KTemplate(ITemplate):
     BigGSM = "biggsm"
 
-    def prompt(self, data: "GSM8KData") -> str:
+    def prompt(self, data: GSM8KData) -> str:
         if self == self.BigGSM:
             # https://github.com/LightChen233/reasoning-boundary/blob/908b7bf0348d6f3b0696c3cef58d7ba4aeb45314/request_marp.py#L21
             return (
@@ -57,7 +57,7 @@ class ARCTemplate(ITemplate):
     OpenCompass = "opencompass"
     OpenCompassCoT = "opencompass-cot"
 
-    def prompt(self, data: "ARCData") -> str:
+    def prompt(self, data: ARCData) -> str:
         if self == self.OpenCompass:
             # https://github.com/open-compass/opencompass/blob/277d7946f5ac314138b8c30e985ebde87552e474/opencompass/configs/datasets/ARC_c/ARC_c_gen_1e0de5.py#L20
             return (
@@ -79,7 +79,7 @@ class LogiQATemplate(ITemplate):
     CoTEval = "coteval"
     CoTEvalCoT = "coteval-cot"
 
-    def prompt(self, data: "LogiQAData") -> str:
+    def prompt(self, data: LogiQAData) -> str:
         if self == self.CoTEval:
             # https://github.com/logikon-ai/cot-eval/blob/5df942c22f4222fe449ac9e413ce5c318f3af08d/eleuther/tasks/logikon/utils_logikon.py#L2
             return (
@@ -101,15 +101,44 @@ class LogiQATemplate(ITemplate):
                 + "\n".join([f"{k}. {v}" for k, v in data.choices.items()])
                 + "\nAnswer:"
             )
+
+
+class GAOKAOTemplate(ITemplate):
+    OpenCompass = "opencompass"
+    OpenCompassCoT = "opencompass-cot"
+
+    def prompt(self, data: GAOKAOData) -> str:
+        if self == self.OpenCompass:
+            return (
+                "请你做一道物理选择题。\n"
+                "你将从A，B，C，D中选出所有符合题意的答案，并写在【答案】和<eoa>之间。\n"
+                "例如：【答案】 AB <eoa>\n"
+                "完整的题目回答的格式如下：\n"
+                "【答案】... <eoa>\n"
+                "请你严格按照上述格式作答。\n"
+                f"{data.question_and_choices}"
+            )
+        elif self == self.OpenCompassCoT:
+            # https://github.com/open-compass/opencompass/blob/b9de8b0e2b47f9561395c6e5fd23bd4ca1e5e4f6/opencompass/configs/datasets/GaokaoBench/GaokaoBench_prompts.py#L33
+            return (
+                "请你做一道物理选择题。\n"
+                "请你一步一步思考并将思考过程写在【解析】和<eoe>之间。你将从A，B，C，D中选出所有符合题意的答案，并写在【答案】和<eoa>之间。\n"
+                "例如：【答案】 AB <eoa>\n"
+                "完整的题目回答的格式如下：\n"
+                "【解析】 ... <eoe>\n"
+                "【答案】... <eoa>\n"
+                "请你严格按照上述格式作答。\n"
+                f"{data.question_and_choices}"
+            )
         else:
             assert_never(self)
 
 
-Template = TypeVar("Template", GSM8KTemplate, ARCTemplate, LogiQATemplate)
+Template = TypeVar("Template", GSM8KTemplate, ARCTemplate, LogiQATemplate, GAOKAOTemplate)
 
 
-def string_to_template(string: str) -> GSM8KTemplate | ARCTemplate | LogiQATemplate:
-    template_cls = [GSM8KTemplate, ARCTemplate, LogiQATemplate]
+def string_to_template(string: str) -> GSM8KTemplate | ARCTemplate | LogiQATemplate | GAOKAOTemplate:
+    template_cls = [GSM8KTemplate, ARCTemplate, LogiQATemplate, GAOKAOTemplate]
     for cls in template_cls:
         for t in cls:
             if t.value == string:

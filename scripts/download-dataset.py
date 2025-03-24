@@ -5,7 +5,8 @@ os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 from pathlib import Path
 
 from datasets import load_dataset
-from confidence.data import GSM8KData, ARCData, LogiQAData
+
+from confidence.data import ARCData, GAOKAOData, GSM8KData, LogiQAData
 from confidence.utils import gsm8k_postprocess
 
 if __name__ == "__main__":
@@ -53,5 +54,18 @@ if __name__ == "__main__":
                 question=data["question"],
                 choices={k: v for k, v in zip(["A", "B", "C", "D"], data["options"])},
                 answer_key=["A", "B", "C", "D"][data["answer"]],
+            )
+            f.write(data.model_dump_json() + "\n")
+
+    dataset = load_dataset("hails/agieval-gaokao-physics", split="test")
+    save_to = Path("./dataset/gaokao_physics.jsonl")
+    if not save_to.exists():
+        save_to.parent.mkdir(exist_ok=True)
+    with open(save_to, "w") as f:
+        for i, data in enumerate(dataset):
+            data = GAOKAOData(
+                id=i,
+                question_and_choices=data["query"],
+                answer_keys=" ".join([["A", "B", "C", "D"][answer_index] for answer_index in data["gold"]]),
             )
             f.write(data.model_dump_json() + "\n")

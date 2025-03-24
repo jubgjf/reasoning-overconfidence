@@ -104,3 +104,23 @@ def first_option_postprocess(text: str, options: str = "ABCD", cushion: bool = T
                     assert text[answer_char_index] == i
                     return Ok((i, answer_char_index))
     return Err(f"No option found in response: {text}")
+
+
+def gaokao_postprocess(text: str, options: str = "ABCD") -> Result[tuple[str, int, int], str]:
+    match = re.search(r"【答案】\s?(.*)\s?<eoa>", text, re.DOTALL)
+    if match:
+        if match.group(1) is not None and match.group(1) != "":
+            outputs = match.group(1)
+        else:
+            outputs = match.group(0)
+        choices, first_answer_char_index = [], 99999
+        for i in options:
+            if i in outputs:
+                answer_char_index = match.start() + text[match.start() : match.end()].index(i)
+                assert text[answer_char_index] == i
+                choices.append(i)
+                first_answer_char_index = (
+                    answer_char_index if first_answer_char_index > answer_char_index else first_answer_char_index
+                )
+        return Ok((" ".join(choices), first_answer_char_index, len(choices)))
+    return Err(f"No option found in response: {text}")

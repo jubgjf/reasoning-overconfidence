@@ -13,7 +13,7 @@ from .data import Data
 from .template import Template
 from .dataset import DatasetName
 from .model import Model
-from .utils import first_option_postprocess, gsm8k_postprocess
+from .utils import first_option_postprocess, gsm8k_postprocess, gaokao_postprocess
 
 
 class MethodName(Enum):
@@ -106,6 +106,12 @@ class Method:
                 if extracted_result.is_err():
                     return extracted_result
                 extracted_answer, _ = extracted_result.ok_value
+            elif dataset_name == DatasetName.GAOKAO_Physics:
+                extracted_result = gaokao_postprocess(answer_response)
+                if extracted_result.is_err():
+                    return extracted_result
+                extracted_answer, _, _ = extracted_result.ok_value
+                raise NotImplementedError
             else:
                 assert_never(self)
             confidence_score_matches = re.findall(r"\[\[(100|[1-9]?[0-9])]]", confidence_response)
@@ -203,6 +209,8 @@ class Method:
                     k: v / sum(logprobs_unnormalized.values()) for k, v in logprobs_unnormalized.items()
                 }
                 return Ok((extracted_answer, logprobs_normalized[extracted_answer]))
+            elif dataset_name == DatasetName.GAOKAO_Physics:
+                raise NotImplementedError
             else:
                 assert_never(self)
         elif self._name == self._name.P_True:
@@ -216,6 +224,8 @@ class Method:
                 if extracted_result.is_err():
                     return extracted_result
                 extracted_answer, _ = extracted_result.ok_value
+            elif dataset_name == DatasetName.GAOKAO_Physics:
+                raise NotImplementedError
             else:
                 assert_never(self)
 
