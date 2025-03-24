@@ -25,4 +25,10 @@ class LogiQAData(BaseModel):
     answer_key: str
 
 
-Data = TypeVar("Data", GSM8KData, ARCData, LogiQAData)
+class GAOKAOData(BaseModel):
+    id: int
+    question_and_choices: str
+    answer_keys: str
+
+
+Data = TypeVar("Data", GSM8KData, ARCData, LogiQAData, GAOKAOData)
