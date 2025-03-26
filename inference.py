@@ -8,20 +8,19 @@ from tqdm.auto import tqdm
 
 from confidence.data import Data
 from confidence.dataset import DatasetName
+from confidence.extractor import extract_answer_and_confidence
 from confidence.logger import Logger, list_history_to_dict
-from confidence.method import MethodName, Method, Response
+from confidence.method import Method, MethodName, Response
 from confidence.model import Model, ModelName
-from confidence.template import GSM8KTemplate, ARCTemplate, LogiQATemplate, Template, string_to_template
+from confidence.template import ARCTemplate, GAOKAOTemplate, GSM8KTemplate, LogiQATemplate, Template, string_to_template
 from confidence.utils import limit_concurrency
 
 
 class Argument(Tap):
     model: ModelName = ModelName.QWEN2_5_7B
-    dataset: DatasetName = DatasetName.GSM8K
-    template: GSM8KTemplate | ARCTemplate | LogiQATemplate = GSM8KTemplate.BigGSM
+    dataset: DatasetName = DatasetName.LogiQA
+    template: GSM8KTemplate | ARCTemplate | LogiQATemplate | GAOKAOTemplate = LogiQATemplate.CoTEval
     method: MethodName = MethodName.Verbal_0_100
-    # method: MethodName = MethodName.LogProb
-    # method: MethodName = MethodName.P_True
     max_samples: int | None = None
     force_update: bool = False
     concurrency: int = 100
@@ -84,7 +83,8 @@ async def main(args: Argument):
 
             history = response_result.ok_value.messages
             assert history[-1]["role"] == "assistant"
-            answer_and_confidence_result = method.extract_answer_and_confidence(
+            answer_and_confidence_result = extract_answer_and_confidence(
+                method_name=args.method,
                 dataset_name=args.dataset,
                 answer_response=history[1]["content"],
                 confidence_response=history[-1]["content"] if args.method.need_another_turn else None,
