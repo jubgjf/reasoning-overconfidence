@@ -22,6 +22,7 @@ class Argument(Tap):
     template: GSM8KTemplate | ARCTemplate | LogiQATemplate | GAOKAOTemplate = LogiQATemplate.CoTEval
     method: MethodName = MethodName.Verbal_0_100
     max_samples: int | None = None
+    no_cot_memory: bool = False
     force_update: bool = False
     concurrency: int = 100
     debug: bool = False
@@ -30,16 +31,25 @@ class Argument(Tap):
         self.add_argument("--template", type=string_to_template)
 
 
-async def request(method: Method, model: Model, template: Template, data: Data) -> tuple[str, Result[Response, str]]:
-    response_result = await method.request(model, data, template, temperature=0.2, max_tokens=16384)
+async def request(
+    method: Method,
+    model: Model,
+    template: Template,
+    data: Data,
+    no_cot_memory: bool = False,
+) -> tuple[str, Result[Response, str]]:
+    response_result = await method.request(
+        model, data, template, temperature=0.2, max_tokens=16384, no_cot_memory=no_cot_memory
+    )
     return data, response_result
 
 
 async def main(args: Argument):
     record_cls = args.dataset.record_cls
+    title = f"{args.dataset}--{args.method}--no-cot-memory-{args.no_cot_memory}--{args.template}--{args.model}"
     db_logger = Logger(
         db_name=args.dataset.value if not args.debug else "debug",
-        table_name=f"{args.dataset}--{args.method}--{args.template}--{args.model}",
+        table_name=title,
         record_cls=record_cls,
         force_update=args.force_update,
     )
@@ -66,14 +76,13 @@ async def main(args: Argument):
             logger.info(f"Example: {dataset[0]}")
 
         # ===== task =====
-        tasks = [request(method=method, model=model, template=args.template, data=data) for data in dataset]
+        tasks = [
+            request(method=method, model=model, template=args.template, data=data, no_cot_memory=args.no_cot_memory)
+            for data in dataset
+        ]
         tasks = limit_concurrency(tasks, args.concurrency)
 
-        async for zip_response in tqdm(
-            asyncio.as_completed(tasks),
-            total=len(tasks),
-            desc=f"{args.dataset}--{args.method}--{args.template}--{args.model}",
-        ):
+        async for zip_response in tqdm(asyncio.as_completed(tasks), total=len(tasks), desc=title):
             data: Data
             response_result: Result[Response, str]
             data, response_result = await zip_response
@@ -81,14 +90,17 @@ async def main(args: Argument):
                 logger.error(response_result.err_value)
                 continue
 
-            history = response_result.ok_value.messages
+            history, turn_0, turn_1 = (
+                response_result.ok_value.history,
+                response_result.ok_value.turn_0,
+                response_result.ok_value.turn_1,
+            )
             assert history[-1]["role"] == "assistant"
             answer_and_confidence_result = extract_answer_and_confidence(
                 method_name=args.method,
                 dataset_name=args.dataset,
-                answer_response=history[1]["content"],
-                confidence_response=history[-1]["content"] if args.method.need_another_turn else None,
-                logprobs=response_result.ok_value.logprobs,
+                question_turn=turn_0,
+                confidence_turn=turn_1,
             )
             if answer_and_confidence_result.is_err():
                 logger.error(answer_and_confidence_result.err_value)
@@ -97,9 +109,10 @@ async def main(args: Argument):
             model_answer_extracted, confidence_extracted = answer_and_confidence_result.ok_value
             record = record_cls(
                 **data.model_dump(),
-                model_answer_response=history[1]["content"],
+                model_thinking_response=turn_0.thinking_content,
+                model_answer_response=turn_0.answer_content,
                 model_answer_extracted=model_answer_extracted,
-                model_confidence_response=history[-1]["content"] if args.method.need_another_turn else "NONE",
+                model_confidence_response=turn_1.answer_content if turn_1 is not None else "",
                 model_confidence_extracted=confidence_extracted,
                 template=args.template.value,
                 method=args.method.value,

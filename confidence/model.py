@@ -9,6 +9,7 @@ from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletionTokenLogprob
 from pydantic import BaseModel
 from result import Err, Ok, Result
+from transformers import AutoTokenizer
 
 
 class ModelName(Enum):
@@ -53,6 +54,7 @@ class Model:
     def __init__(self, model_name: ModelName):
         self._model_name = model_name
         self._client = self._get_client()
+        self._tokenizer = AutoTokenizer.from_pretrained(self._model_name.hf_name)
 
     @staticmethod
     def _get_client() -> AsyncOpenAI:
@@ -107,3 +109,11 @@ class Model:
             await asyncio.sleep(0.1)
 
         return response_result
+
+    def string_to_token_id(self, text: str) -> int:
+        token_ids = self._tokenizer.encode(text)
+        assert len(token_ids) == 1
+        return token_ids[0]
+
+    def token_ids_to_string(self, token_ids: list[int]) -> str:
+        return self._tokenizer.decode(token_ids)

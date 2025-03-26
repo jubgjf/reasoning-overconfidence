@@ -14,6 +14,7 @@ TableClass: Type[TortoiseModel]
 
 
 class IRecord(ABC, BaseModel):
+    model_thinking_response: str
     model_answer_response: str
     model_answer_extracted: str
     model_confidence_response: str

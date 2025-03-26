@@ -2,6 +2,7 @@ import asyncio
 import re
 from collections.abc import Coroutine, Sequence
 
+from openai.types.chat import ChatCompletionTokenLogprob
 from result import Err, Ok, Result
 
 
@@ -43,11 +44,7 @@ def gsm8k_postprocess(text: str) -> Result[tuple[str, int, int], str]:
 def first_option_postprocess(
     text: str, options: str = "ABCD", cushion: bool = True
 ) -> Result[tuple[str, int, int], str]:
-    if "</think>" in text:
-        thinking_content, answer_content = text.split("</think>")
-        thinking_content += "</think>"
-    else:
-        thinking_content, answer_content = "", text
+    thinking_content, answer_content = split_thinking_answer(text)
 
     # https://github.com/open-compass/opencompass/blob/854c6bf025ed53e332ae58a7ee66807eae48618d/opencompass/utils/text_postprocessors.py#L73
     patterns = [
@@ -88,7 +85,6 @@ def first_option_postprocess(
         r"答案为\s?(\S+)(?:。|$)",
         rf"(?i)ANSWER\s*:\s*([{options}])",
         rf"(?i)ANSWER\*?\*?:?\s+\*?\*?([{options}])",
-        # rf"#+\s+(?i)ANSWER\*?\*?:?\s+\*?\*?([{options}])",
         rf"[Tt]he answer is:?\s+\(?([{options}])\)?",
         rf"[Tt]he answer is:?\s+\(?\*?\*?([{options}])\*?\*?\)?",
         rf"[Tt]he answer is option:?\s+\(?([{options}])\)?",
@@ -106,6 +102,8 @@ def first_option_postprocess(
         rf"1.\s?([{options}])[.。$]?$",
     ]
     cushion_patterns = [
+        rf"\*\*([{options}])[\s\n\.:]",
+        rf"([{options}])[\s\n\.:]",
         rf"([{options}]):",
         rf"([{options}])",
     ]
@@ -128,11 +126,7 @@ def first_option_postprocess(
 
 
 def gaokao_postprocess(text: str, options: str = "ABCD") -> Result[tuple[str, int, int], str]:
-    if "</think>" in text:
-        thinking_content, answer_content = text.split("</think>")
-        thinking_content += "</think>"
-    else:
-        thinking_content, answer_content = "", text
+    thinking_content, answer_content = split_thinking_answer(text)
 
     match = re.search(r"【答案】\s?(.*)\s?<eoa>", answer_content, re.DOTALL)
     if match:
@@ -151,3 +145,38 @@ def gaokao_postprocess(text: str, options: str = "ABCD") -> Result[tuple[str, in
                 )
         return Ok((" ".join(choices), len(thinking_content) + first_answer_char_index, len(choices)))
     return Err(f"No option found in response: {answer_content}")
+
+
+def split_thinking_answer(text: str) -> tuple[str, str]:
+    if "</think>" in text:
+        thinking_content, answer_content = text.split("</think>")
+        thinking_content += "</think>"
+    else:
+        thinking_content, answer_content = "", text
+
+    return thinking_content, answer_content
+
+
+def split_thinking_answer_logprobs(
+    logprobs: list[ChatCompletionTokenLogprob] | None,
+) -> tuple[list[ChatCompletionTokenLogprob] | None, list[ChatCompletionTokenLogprob] | None]:
+    if logprobs is None:
+        return None, None
+
+    logprobs = [t for t in logprobs if t.token != "<|im_end|>"]
+
+    if not any([t.token == "</think>" for t in logprobs]):
+        return None, logprobs
+
+    found_think_end = False
+    thinking_logprobs, answer_logprobs = [], []
+    for t in logprobs:
+        if not found_think_end:
+            thinking_logprobs.append(t)
+        else:
+            answer_logprobs.append(t)
+
+        if t.token == "</think>":
+            found_think_end = True
+
+    return thinking_logprobs, answer_logprobs
