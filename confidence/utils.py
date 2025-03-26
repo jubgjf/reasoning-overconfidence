@@ -2,7 +2,7 @@ import asyncio
 import re
 from collections.abc import Coroutine, Sequence
 
-from result import Result, Ok, Err
+from result import Err, Ok, Result
 
 
 def limit_concurrency(coroutines: Sequence[Coroutine], concurrency: int) -> list[Coroutine]:
@@ -16,22 +16,39 @@ def limit_concurrency(coroutines: Sequence[Coroutine], concurrency: int) -> list
 
 
 def gsm8k_postprocess(text: str) -> Result[tuple[str, int, int], str]:
+    if "</think>" in text:
+        thinking_content, answer_content = text.split("</think>")
+        thinking_content += "</think>"
+    else:
+        thinking_content, answer_content = "", text
+
     # pattern is from https://github.com/open-compass/opencompass/blob/854c6bf025ed53e332ae58a7ee66807eae48618d/opencompass/datasets/gsm8k.py#L44
     pattern = r"-?\d+\.\d+|-?\d+"
-    numbers = re.finditer(pattern, text)
+    numbers = re.finditer(pattern, answer_content)
     numbers = [n for n in numbers]
     if len(numbers) == 0:
-        return Err(f"No number found in response: {text}")
+        return Err(f"No number found in response: {answer_content}")
     extracted_answer = numbers[-1].group()
-    answer_num_index = numbers[-1].start() + text[numbers[-1].start() : numbers[-1].end()].index(extracted_answer)
+    answer_num_index = numbers[-1].start() + answer_content[numbers[-1].start() : numbers[-1].end()].index(
+        extracted_answer
+    )
     answer_num_len = len(extracted_answer)
-    assert text[answer_num_index : answer_num_index + answer_num_len] == extracted_answer
-    return Ok((extracted_answer, answer_num_index, answer_num_len))
+    assert (
+        text[len(thinking_content) + answer_num_index : len(thinking_content) + answer_num_index + answer_num_len]
+        == extracted_answer
+    )
+    return Ok((extracted_answer, len(thinking_content) + answer_num_index, answer_num_len))
 
 
 def first_option_postprocess(
     text: str, options: str = "ABCD", cushion: bool = True
 ) -> Result[tuple[str, int, int], str]:
+    if "</think>" in text:
+        thinking_content, answer_content = text.split("</think>")
+        thinking_content += "</think>"
+    else:
+        thinking_content, answer_content = "", text
+
     # https://github.com/open-compass/opencompass/blob/854c6bf025ed53e332ae58a7ee66807eae48618d/opencompass/utils/text_postprocessors.py#L73
     patterns = [
         rf"答案是?\s*([{options}])",
@@ -70,10 +87,13 @@ def first_option_postprocess(
         r"答案应该是\s?(\S+)(?:。|$)",
         r"答案为\s?(\S+)(?:。|$)",
         rf"(?i)ANSWER\s*:\s*([{options}])",
+        rf"(?i)ANSWER\*?\*?:?\s+\*?\*?([{options}])",
+        # rf"#+\s+(?i)ANSWER\*?\*?:?\s+\*?\*?([{options}])",
         rf"[Tt]he answer is:?\s+\(?([{options}])\)?",
         rf"[Tt]he answer is:?\s+\(?\*?\*?([{options}])\*?\*?\)?",
         rf"[Tt]he answer is option:?\s+\(?([{options}])\)?",
         rf"[Tt]he correct answer is:?\s+\(?([{options}])\)?",
+        rf"[Tt]he correct answer is:?\*?\*?([{options}])",
         rf"[Tt]he correct answer is option:?\s+\(?([{options}])\)?",
         rf"[Tt]he correct answer is:?.*?boxed{{([{options}])}}",
         rf"[Tt]he correct option is:?.*?boxed{{([{options}])}}",
@@ -93,8 +113,7 @@ def first_option_postprocess(
     if cushion:
         patterns.extend(cushion_patterns)
     for pattern in patterns:
-        text = text.strip()
-        match = re.search(pattern, text, re.DOTALL)
+        match = re.search(pattern, answer_content, re.DOTALL)
         if match:
             if match.group(1) is not None and match.group(1) != "":
                 outputs = match.group(1)
@@ -102,14 +121,20 @@ def first_option_postprocess(
                 outputs = match.group(0)
             for i in options:
                 if i in outputs:
-                    answer_char_index = match.start() + text[match.start() : match.end()].index(i)
-                    assert text[answer_char_index] == i
-                    return Ok((i, answer_char_index, 1))
-    return Err(f"No option found in response: {text}")
+                    answer_char_index = match.start() + answer_content[match.start() : match.end()].index(i)
+                    assert text[len(thinking_content) + answer_char_index] == i
+                    return Ok((i, len(thinking_content) + answer_char_index, 1))
+    return Err(f"No option found in response: {answer_content}")
 
 
 def gaokao_postprocess(text: str, options: str = "ABCD") -> Result[tuple[str, int, int], str]:
-    match = re.search(r"【答案】\s?(.*)\s?<eoa>", text, re.DOTALL)
+    if "</think>" in text:
+        thinking_content, answer_content = text.split("</think>")
+        thinking_content += "</think>"
+    else:
+        thinking_content, answer_content = "", text
+
+    match = re.search(r"【答案】\s?(.*)\s?<eoa>", answer_content, re.DOTALL)
     if match:
         if match.group(1) is not None and match.group(1) != "":
             outputs = match.group(1)
@@ -118,11 +143,11 @@ def gaokao_postprocess(text: str, options: str = "ABCD") -> Result[tuple[str, in
         choices, first_answer_char_index = [], 99999
         for i in options:
             if i in outputs:
-                answer_char_index = match.start() + text[match.start() : match.end()].index(i)
-                assert text[answer_char_index] == i
+                answer_char_index = match.start() + answer_content[match.start() : match.end()].index(i)
+                assert text[len(thinking_content) + answer_char_index] == i
                 choices.append(i)
                 first_answer_char_index = (
                     answer_char_index if first_answer_char_index > answer_char_index else first_answer_char_index
                 )
-        return Ok((" ".join(choices), first_answer_char_index, len(choices)))
-    return Err(f"No option found in response: {text}")
+        return Ok((" ".join(choices), len(thinking_content) + first_answer_char_index, len(choices)))
+    return Err(f"No option found in response: {answer_content}")

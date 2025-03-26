@@ -23,9 +23,13 @@ def extract_answer_and_verbal_confidence(
         return extracted_result
     extracted_answer, _, _ = extracted_result.ok_value
 
-    confidence_score_matches = re.findall(r"\[\[(100|[1-9]?[0-9])]]", confidence_response)
+    if "</think>" in confidence_response:
+        _, confidence_response_no_thinking = confidence_response.split("</think>")
+    else:
+        confidence_response_no_thinking = confidence_response
+    confidence_score_matches = re.findall(r"\[\[(100|[1-9]?[0-9])]]", confidence_response_no_thinking)
     if len(confidence_score_matches) < 1:
-        return Err(f"No confidence score found in confidence response: {confidence_response}")
+        return Err(f"No confidence score found in confidence response: {confidence_response_no_thinking}")
     return Ok((extracted_answer, float(confidence_score_matches[0])))
 
 
@@ -91,9 +95,13 @@ def extract_answer_and_p_true_confidence(
         return extracted_result
     extracted_answer, _, _ = extracted_result.ok_value
 
-    confidence_score_matches = re.findall(r"\[\[([01])]]", confidence_response)
+    if "</think>" in confidence_response:
+        _, confidence_response_no_thinking = confidence_response.split("</think>")
+    else:
+        confidence_response_no_thinking = confidence_response
+    confidence_score_matches = re.findall(r"\[\[([01])]]", confidence_response_no_thinking)
     if len(confidence_score_matches) < 1:
-        return Err(f"No confidence score found in confidence response: {confidence_response}")
+        return Err(f"No confidence score found in confidence response: {confidence_response_no_thinking}")
     found_left_quote, found_number, found_right_quote, number_token_index = False, False, False, None
     for i, tok in enumerate(logprobs):
         if tok.token.strip() == "[[":
