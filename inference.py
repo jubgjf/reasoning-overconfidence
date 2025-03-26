@@ -17,7 +17,7 @@ from confidence.utils import limit_concurrency
 
 
 class Argument(Tap):
-    model: ModelName = ModelName.QWEN2_5_7B
+    model: ModelName = ModelName.QWQ_32B
     dataset: DatasetName = DatasetName.LogiQA
     template: GSM8KTemplate | ARCTemplate | LogiQATemplate | GAOKAOTemplate = LogiQATemplate.CoTEval
     method: MethodName = MethodName.Verbal_0_100
