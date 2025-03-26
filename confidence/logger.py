@@ -8,7 +8,7 @@ from tortoise import Tortoise, fields
 from tortoise.contrib.pydantic import pydantic_queryset_creator
 from tortoise.models import Model as TortoiseModel
 
-from confidence.data import ARCData, GAOKAOData, GSM8KData, LogiQAData
+from .data import ARCData, GAOKAOData, GSM8KData, LogiQAData
 
 TableClass: Type[TortoiseModel]
 

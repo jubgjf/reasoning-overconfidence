@@ -29,7 +29,9 @@ def gsm8k_postprocess(text: str) -> Result[tuple[str, int, int], str]:
     return Ok((extracted_answer, answer_num_index, answer_num_len))
 
 
-def first_option_postprocess(text: str, options: str = "ABCD", cushion: bool = True) -> Result[tuple[str, int], str]:
+def first_option_postprocess(
+    text: str, options: str = "ABCD", cushion: bool = True
+) -> Result[tuple[str, int, int], str]:
     # https://github.com/open-compass/opencompass/blob/854c6bf025ed53e332ae58a7ee66807eae48618d/opencompass/utils/text_postprocessors.py#L73
     patterns = [
         rf"答案是?\s*([{options}])",
@@ -102,7 +104,7 @@ def first_option_postprocess(text: str, options: str = "ABCD", cushion: bool = T
                 if i in outputs:
                     answer_char_index = match.start() + text[match.start() : match.end()].index(i)
                     assert text[answer_char_index] == i
-                    return Ok((i, answer_char_index))
+                    return Ok((i, answer_char_index, 1))
     return Err(f"No option found in response: {text}")
 
 
