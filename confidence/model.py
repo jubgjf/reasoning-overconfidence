@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from loguru import logger
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletionTokenLogprob
+from openai.types.completion_choice import Logprobs
 from pydantic import BaseModel
 from result import Err, Ok, Result
 from transformers import AutoTokenizer
@@ -45,9 +46,14 @@ class ModelName(Enum):
             assert_never(self)
 
 
-class APIResponse(BaseModel):
+class ChatAPIResponse(BaseModel):
     message_content: str
     logprobs_content: list[ChatCompletionTokenLogprob] | None
+
+
+class CompleteAPIResponse(BaseModel):
+    text_content: str
+    logprobs_content: Logprobs | None
 
 
 class Model:
@@ -77,8 +83,8 @@ class Model:
         temperature: float = 0,
         max_tokens: int = 16384,
         logprobs: bool = False,
-    ) -> Result[APIResponse, str]:
-        async def request_once() -> Result[APIResponse, str]:
+    ) -> Result[ChatAPIResponse, str]:
+        async def request_once() -> Result[ChatAPIResponse, str]:
             try:
                 response = await self._client.chat.completions.create(
                     model=self._model_name.model_id,
@@ -89,7 +95,7 @@ class Model:
                     top_logprobs=5 if logprobs else None,
                 )
                 return Ok(
-                    APIResponse(
+                    ChatAPIResponse(
                         message_content=response.choices[0].message.content,
                         logprobs_content=response.choices[0].logprobs.content if logprobs else None,
                     )
@@ -110,6 +116,45 @@ class Model:
 
         return response_result
 
+    async def complete(
+        self,
+        prompt: str,
+        temperature: float = 0,
+        max_tokens: int = 16384,
+        logprobs: bool = False,
+    ) -> Result[CompleteAPIResponse, str]:
+        async def request_once() -> Result[CompleteAPIResponse, str]:
+            try:
+                response = await self._client.completions.create(
+                    model=self._model_name.model_id,
+                    prompt=prompt,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    logprobs=5 if logprobs else None,
+                )
+                return Ok(
+                    CompleteAPIResponse(
+                        text_content=response.choices[0].text,
+                        logprobs_content=response.choices[0].logprobs if logprobs else None,
+                    )
+                )
+            except Exception as e:
+                err_msg = f"Error: {e}"
+                return Err(err_msg)
+
+        # TODO refactor request&complete
+        retry, tolerance = 0, 5
+        response_result = Err("Failed to request")
+        while retry < tolerance:
+            response_result = await request_once()
+            if response_result.is_ok():
+                break
+            retry += 1
+            logger.error(f"Retry: {retry}/{tolerance}. Failure: {response_result.err_value} ")
+            await asyncio.sleep(0.1)
+
+        return response_result
+
     def string_to_token_id(self, text: str) -> int:
         token_ids = self._tokenizer.encode(text)
         assert len(token_ids) == 1
@@ -117,3 +162,6 @@ class Model:
 
     def token_ids_to_string(self, token_ids: list[int]) -> str:
         return self._tokenizer.decode(token_ids)
+
+    def apply_chat_template(self, messages: list[dict[str, str]]) -> str:
+        return self._tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)

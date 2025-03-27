@@ -1,13 +1,16 @@
+import asyncio
+import re
 from enum import Enum
 from typing import assert_never
 
 from loguru import logger
 from openai.types.chat import ChatCompletionTokenLogprob
+from openai.types.completion_choice import Logprobs
 from pydantic import BaseModel
-from result import Ok, Result
+from result import Err, Ok, Result
 
 from .data import Data
-from .model import Model
+from .model import CompleteAPIResponse, Model
 from .template import Template
 from .utils import split_thinking_answer, split_thinking_answer_logprobs
 
@@ -40,17 +43,24 @@ class MethodName(Enum):
             assert_never(self)
 
 
-class ResponsePerTurn(BaseModel):
+class ChatResponsePerTurn(BaseModel):
     thinking_content: str | None
     answer_content: str
     thinking_logprobs: list[ChatCompletionTokenLogprob] | None
     answer_logprobs: list[ChatCompletionTokenLogprob] | None
 
 
+class CompleteResponsePerTurn(BaseModel):
+    thinking_content: str | None
+    answer_content: str
+    thinking_logprobs: Logprobs | None
+    answer_logprobs: Logprobs | None
+
+
 class Response(BaseModel):
     history: list[dict[str, str]]
-    turn_0: ResponsePerTurn
-    turn_1: ResponsePerTurn | None
+    turn_0: ChatResponsePerTurn | CompleteResponsePerTurn
+    turn_1: ChatResponsePerTurn | None
 
 
 class Method:
@@ -58,11 +68,16 @@ class Method:
         self._name = name
 
     @staticmethod
-    def _validate_text_vs_tokens(text: str, tokens: list[ChatCompletionTokenLogprob] | None):
+    def _validate_text_vs_tokens(text: str, tokens: list[ChatCompletionTokenLogprob] | Logprobs | None):
         if tokens is None:
             return
 
-        text_from_tokens = "".join([t.token for t in tokens])
+        if isinstance(tokens, list):
+            text_from_tokens = "".join([t.token for t in tokens])
+        elif isinstance(tokens, Logprobs):
+            text_from_tokens = "".join(tokens.tokens)
+        else:
+            assert_never(tokens)
 
         # Try eliminating unicode chars
         unicode_chars, broken_char = ["÷", "≈"], "��"
@@ -101,7 +116,7 @@ class Method:
         self._validate_text_vs_tokens(thinking_content, thinking_logprobs)
         self._validate_text_vs_tokens(answer_content, answer_logprobs)
 
-        turn_0 = ResponsePerTurn(
+        turn_0 = ChatResponsePerTurn(
             thinking_content=thinking_content,
             answer_content=answer_content,
             thinking_logprobs=thinking_logprobs.copy() if thinking_logprobs is not None else None,
@@ -127,7 +142,7 @@ class Method:
         self._validate_text_vs_tokens(thinking_content, thinking_logprobs)
         self._validate_text_vs_tokens(answer_content, answer_logprobs)
 
-        turn_1 = ResponsePerTurn(
+        turn_1 = ChatResponsePerTurn(
             thinking_content=thinking_content,
             answer_content=answer_content,
             thinking_logprobs=thinking_logprobs.copy() if thinking_logprobs is not None else None,
@@ -135,3 +150,112 @@ class Method:
         )
         assert len(messages) == 4
         return Ok(Response(history=messages, turn_0=turn_0, turn_1=turn_1))
+
+    async def request_fake_reflection(
+        self,
+        model: Model,
+        data: Data,
+        template: Template,
+        history_thinking_content: str,
+        temperature: float = 0,
+        max_tokens: int = 16384,
+        no_cot_memory: bool = False,
+    ) -> Result[list[Response], str]:
+        reflection_patterns = [
+            r"^Wait,.*\n\n",
+            r"^Let me double-check.*\n\n",
+            r"^Let me think again.*\n\n",
+        ]
+        combined_pattern = "|".join(reflection_patterns)
+
+        # thinking_steps_by_reflection =
+        #     0: thinking...  1: reflection...
+        #     2: thinking...  3: reflection...
+        #     4: thinking ...                    # Last step must not be reflection
+        last_step_start_index, thinking_steps_by_reflection = 0, []
+        if history_thinking_content.startswith("<think>\n"):
+            history_thinking_content = history_thinking_content.lstrip("<think>\n")
+        for m in re.finditer(combined_pattern, history_thinking_content, re.M):
+            thinking_steps_by_reflection.append(history_thinking_content[last_step_start_index : m.start()])
+            thinking_steps_by_reflection.append(m.group())
+            last_step_start_index = m.end()
+        thinking_steps_by_reflection.append(history_thinking_content[last_step_start_index:])
+        if len(history_thinking_content) == last_step_start_index:
+            # Last step is reflection, although this might be impossible. Remove it.
+            thinking_steps_by_reflection = thinking_steps_by_reflection[:-2]
+
+        thinking_with_reduced_reflection = []
+        for i in range(0, len(thinking_steps_by_reflection), 2):
+            thinking_with_reduced_reflection.append(thinking_steps_by_reflection[: i + 1])
+
+        # ===== First turn =====
+        user_input = model.apply_chat_template([{"role": "user", "content": template.prompt(data)}])
+        user_input_with_thinking = [user_input + "".join(steps) for steps in thinking_with_reduced_reflection]
+        user_input_with_thinking = [
+            im if im.endswith("</think>") else im + "</think>" for im in user_input_with_thinking
+        ]
+        tasks = [
+            model.complete(
+                prompt=prompt, max_tokens=max_tokens, temperature=temperature, logprobs=self._name.need_logprobs
+            )
+            for prompt in user_input_with_thinking
+        ]
+        response_results: list[Result[CompleteAPIResponse, str]] = await asyncio.gather(*tasks)
+
+        for response_result in response_results:
+            if response_result.is_err():
+                return Err(f"Found err in fake reflection completion: {response_result.err_value}")
+
+        returns = []
+        for prompt, response_result in zip(user_input_with_thinking, response_results):
+            messages = [{"role": "user", "content": template.prompt(data)}]
+
+            model_output = (prompt + response_result.ok_value.text_content)[len(user_input) :]
+            messages.append({"role": "assistant", "content": model_output})
+
+            thinking_content, answer_content = split_thinking_answer(model_output)
+            thinking_logprobs, answer_logprobs = split_thinking_answer_logprobs(
+                response_result.ok_value.logprobs_content
+            )
+            self._validate_text_vs_tokens(thinking_content, thinking_logprobs)
+            self._validate_text_vs_tokens(answer_content, answer_logprobs)
+
+            turn_0 = CompleteResponsePerTurn(
+                thinking_content=thinking_content,
+                answer_content=answer_content,
+                thinking_logprobs=thinking_logprobs.copy() if thinking_logprobs is not None else None,
+                answer_logprobs=answer_logprobs.copy() if answer_logprobs is not None else None,
+            )
+            if not self._name.need_another_turn:
+                assert len(messages) == 2
+                returns.append(Response(history=messages, turn_0=turn_0, turn_1=None))
+                break
+
+            # ===== Second turn (Optional) =====
+            if no_cot_memory:
+                messages[1]["content"] = answer_content
+            messages.append({"role": "user", "content": self._name.prompt})
+            response_result = await model.request(
+                messages=messages, temperature=temperature, max_tokens=max_tokens, logprobs=self._name.need_logprobs
+            )
+            if response_result.is_err():
+                return response_result
+            messages.append({"role": "assistant", "content": response_result.ok_value.message_content})
+
+            thinking_content, answer_content = split_thinking_answer(response_result.ok_value.message_content)
+            thinking_logprobs, answer_logprobs = split_thinking_answer_logprobs(
+                response_result.ok_value.logprobs_content
+            )
+            self._validate_text_vs_tokens(thinking_content, thinking_logprobs)
+            self._validate_text_vs_tokens(answer_content, answer_logprobs)
+
+            turn_1 = ChatResponsePerTurn(
+                thinking_content=thinking_content,
+                answer_content=answer_content,
+                thinking_logprobs=thinking_logprobs.copy() if thinking_logprobs is not None else None,
+                answer_logprobs=answer_logprobs.copy() if answer_logprobs is not None else None,
+            )
+            assert len(messages) == 4
+            returns.append(Response(history=messages, turn_0=turn_0, turn_1=turn_1))
+
+        return Ok(returns)
