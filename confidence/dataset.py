@@ -66,6 +66,14 @@ class IDataset(BaseModel, ABC):
             return dataset
         return [data for data in dataset if data.question_id not in already_processed_ids]
 
+    def load_processed_dataset(
+        self, already_processed_ids: list[int] | None, force_restart: bool = False
+    ) -> list[Data]:
+        dataset = self._load_full_dataset()
+        if force_restart:
+            return []
+        return [data for data in dataset if data.question_id in already_processed_ids]
+
 
 class GSM8KDataset(IDataset):
     @property

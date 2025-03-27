@@ -37,7 +37,7 @@ async def request(
     template: Template,
     data: Data,
     no_cot_memory: bool = False,
-) -> tuple[str, Result[Response, str]]:
+) -> tuple[Data, Result[Response, str]]:
     response_result = await method.request(
         model, data, template, temperature=0.2, max_tokens=16384, no_cot_memory=no_cot_memory
     )

@@ -103,13 +103,15 @@ class Logger:
         records = await self._orm2pydantic.from_queryset(TableClass.all())
         return [self._record_cls(**r) for r in records.model_dump()]
 
-    async def already_processed_ids(self) -> list[int]:
     async def already_processed_question_ids(self) -> list[int]:
         global TableClass
-        records = await TableClass.all().values("id")
-        return [record["id"] for record in records]
         records = await TableClass.all().values("question_id")
         return [record["question_id"] for record in records]
+
+    async def chat_history(self) -> dict[str | int, dict[str, str]]:
+        global TableClass
+        records = await TableClass.all().values("question_id", "history")
+        return {qh["question_id"]: qh["history"] for qh in records}
 
 
 class GSM8KRecord(IRecord, GSM8KData): ...
