@@ -4,21 +4,21 @@ from pydantic import BaseModel
 
 
 class GSM8KData(BaseModel):
-    id: int
+    question_id: int
     question: str
     answer: str
     answer_num: float
 
 
 class ARCData(BaseModel):
-    id: str
+    question_id: str
     question: str
     choices: dict[str, str]
     answer_key: str
 
 
 class LogiQAData(BaseModel):
-    id: int
+    question_id: int
     passage: str
     question: str
     choices: dict[str, str]
@@ -26,7 +26,7 @@ class LogiQAData(BaseModel):
 
 
 class GAOKAOData(BaseModel):
-    id: int
+    question_id: int
     question_and_choices: str
     answer_keys: str
 

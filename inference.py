@@ -13,7 +13,7 @@ from confidence.logger import Logger, list_history_to_dict
 from confidence.method import Method, MethodName, Response
 from confidence.model import Model, ModelName
 from confidence.template import ARCTemplate, GAOKAOTemplate, GSM8KTemplate, LogiQATemplate, Template, string_to_template
-from confidence.utils import limit_concurrency
+from confidence.utils import limit_concurrency, last_git_hash
 
 
 class Argument(Tap):
@@ -63,7 +63,7 @@ async def main(args: Argument):
         # ===== dataset =====
         dataset_cls = args.dataset.dataset_cls
         dataset = dataset_cls().load_resume_dataset(
-            await db_logger.already_processed_ids(),
+            await db_logger.already_processed_question_ids(),
             force_restart=args.force_update,
         )
 
@@ -118,6 +118,8 @@ async def main(args: Argument):
                 method=args.method.value,
                 history=list_history_to_dict(history),
                 model=args.model.value,
+                ref="",
+                git_hash=last_git_hash(),
             )
             await db_logger.insert(record)
 

@@ -1,4 +1,5 @@
 import asyncio
+import git
 import re
 from collections.abc import Coroutine, Sequence
 
@@ -14,6 +15,12 @@ def limit_concurrency(coroutines: Sequence[Coroutine], concurrency: int) -> list
             return await coroutine
 
     return [with_concurrency_limit(coroutine) for coroutine in coroutines]
+
+
+def last_git_hash() -> str:
+    repo = git.Repo(".")
+    commit = repo.head.commit
+    return commit.hexsha[:7]
 
 
 def gsm8k_postprocess(text: str) -> Result[tuple[str, int, int], str]:

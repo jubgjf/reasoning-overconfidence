@@ -64,7 +64,7 @@ class IDataset(BaseModel, ABC):
         dataset = self._load_full_dataset()
         if force_restart:
             return dataset
-        return [data for data in dataset if data.id not in already_processed_ids]
+        return [data for data in dataset if data.question_id not in already_processed_ids]
 
 
 class GSM8KDataset(IDataset):

@@ -23,6 +23,8 @@ class IRecord(ABC, BaseModel):
     method: str
     history: dict  # dict[str, str]
     model: str
+    ref: str  # Some addition notes, can be empty
+    git_hash: str
 
 
 def list_history_to_dict(history: list[dict[str, str]]) -> dict[str, str]:
@@ -102,9 +104,12 @@ class Logger:
         return [self._record_cls(**r) for r in records.model_dump()]
 
     async def already_processed_ids(self) -> list[int]:
+    async def already_processed_question_ids(self) -> list[int]:
         global TableClass
         records = await TableClass.all().values("id")
         return [record["id"] for record in records]
+        records = await TableClass.all().values("question_id")
+        return [record["question_id"] for record in records]
 
 
 class GSM8KRecord(IRecord, GSM8KData): ...

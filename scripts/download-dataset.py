@@ -21,7 +21,7 @@ if __name__ == "__main__":
                 print(answer_num.err_value)
                 continue
             data = GSM8KData(
-                id=i,
+                question_id=i,
                 question=data["question"],
                 answer=data["answer"],
                 answer_num=float(gsm8k_postprocess(data["answer"]).ok_value[0]),
@@ -35,7 +35,7 @@ if __name__ == "__main__":
     with open(save_to, "w") as f:
         for data in dataset:
             data = ARCData(
-                id=data["id"],
+                question_id=data["id"],
                 question=data["question"],
                 choices={k: v for k, v in zip(data["choices"]["label"], data["choices"]["text"])},
                 answer_key=data["answerKey"],
@@ -49,7 +49,7 @@ if __name__ == "__main__":
     with open(save_to, "w") as f:
         for i, data in enumerate(dataset):
             data = LogiQAData(
-                id=i,
+                question_id=i,
                 passage=data["passage"],
                 question=data["question"],
                 choices={k: v for k, v in zip(["A", "B", "C", "D"], data["options"])},
@@ -64,7 +64,7 @@ if __name__ == "__main__":
     with open(save_to, "w") as f:
         for i, data in enumerate(dataset):
             data = GAOKAOData(
-                id=i,
+                question_id=i,
                 question_and_choices=data["query"],
                 answer_keys=" ".join([["A", "B", "C", "D"][answer_index] for answer_index in data["gold"]]),
             )
