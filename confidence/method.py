@@ -65,8 +65,10 @@ class Method:
         text_from_tokens = "".join([t.token for t in tokens])
 
         # Try eliminating unicode chars
-        if "÷" in text:
-            text_from_tokens = text_from_tokens.replace("��", "÷")
+        unicode_chars, broken_char = ["÷", "≈"], "��"
+        for c in unicode_chars:
+            if c in text:
+                text_from_tokens = text_from_tokens.replace(broken_char, c)
         if text != text_from_tokens:
             logger.warning("Text/token mismatch:")
             logger.warning(f"Text  = {text.replace('\n', '\\n')}")
