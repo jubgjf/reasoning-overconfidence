@@ -56,7 +56,7 @@ async def main(args: Argument):
     # ===== full-reflection chat history =====
     load_title = f"{args.dataset}--{args.method}--no-cot-memory-{args.no_cot_memory}--{args.template}--{args.model}"
     db_logger = Logger(
-        db_name=args.dataset.value if not args.debug else "debug",
+        db_name=args.dataset.value,
         table_name=load_title,
         record_cls=record_cls,
     )
