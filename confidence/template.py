@@ -2,7 +2,7 @@ from abc import ABC, ABCMeta, abstractmethod
 from enum import Enum, EnumMeta
 from typing import Type, TypeVar, assert_never
 
-from .data import ARCData, Data, GAOKAOData, GSM8KData, LogiQAData
+from .data import ARCData, Data, GAOKAOData, GSM8KData, LogiQAData, TimeTablingData
 
 
 class ABCEnumMeta(ABCMeta, EnumMeta): ...
@@ -134,7 +134,20 @@ class GAOKAOTemplate(ITemplate):
             assert_never(self)
 
 
-Template = TypeVar("Template", GSM8KTemplate, ARCTemplate, LogiQATemplate, GAOKAOTemplate)
+class TimeTablingTemplate(ITemplate):
+    simple = "simple"
+    cot = "cot"
+
+    def prompt(self, data: TimeTablingData) -> str:
+        if self == self.simple:
+            return f"{data.question}\nPlease provide all feasible schedules that satisfies all constraints one by one."
+        elif self == self.cot:
+            return f"{data.question}\nPlease provide all feasible schedules that satisfies all constraints. Think step by step before answering."
+        else:
+            assert_never(self)
+
+
+Template = TypeVar("Template", GSM8KTemplate, ARCTemplate, LogiQATemplate, GAOKAOTemplate, TimeTablingTemplate)
 
 
 def string_to_template(string: str) -> GSM8KTemplate | ARCTemplate | LogiQATemplate | GAOKAOTemplate:

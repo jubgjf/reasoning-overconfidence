@@ -31,4 +31,10 @@ class GAOKAOData(BaseModel):
     answer_keys: str
 
 
-Data = TypeVar("Data", GSM8KData, ARCData, LogiQAData, GAOKAOData)
+class TimeTablingData(BaseModel):
+    question_id: int
+    question: str
+    answer_example: str
+
+
+Data = TypeVar("Data", GSM8KData, ARCData, LogiQAData, GAOKAOData, TimeTablingData)
