@@ -12,14 +12,14 @@ from confidence.extractor import extract_answer_and_confidence
 from confidence.logger import Logger, list_history_to_dict
 from confidence.method import Method, MethodName, Response
 from confidence.model import Model, ModelName
-from confidence.template import ARCTemplate, GAOKAOTemplate, GSM8KTemplate, LogiQATemplate, Template, string_to_template
+from confidence.template import LogiQATemplate, Template, string_to_template
 from confidence.utils import last_git_hash, limit_concurrency, split_thinking_answer
 
 
 class Argument(Tap):
     model: ModelName = ModelName.QWQ_32B
     dataset: DatasetName = DatasetName.LogiQA
-    template: GSM8KTemplate | ARCTemplate | LogiQATemplate | GAOKAOTemplate = LogiQATemplate.CoTEval
+    template: Template = LogiQATemplate.CoTEval
     method: MethodName = MethodName.Verbal_0_100
     no_cot_memory: bool = False
     force_update: bool = False

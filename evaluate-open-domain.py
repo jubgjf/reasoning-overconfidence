@@ -9,7 +9,7 @@ from tqdm.auto import tqdm
 from confidence.utils import split_thinking_answer, limit_concurrency
 from pydantic import BaseModel
 import pandas as pd
-from confidence.template import GSM8KTemplate, ARCTemplate, LogiQATemplate, TimeTablingTemplate, GAOKAOTemplate
+from confidence.template import TimeTablingTemplate, Template
 from confidence.dataset import DatasetName
 from confidence.logger import Logger
 from confidence.method import MethodName
@@ -66,7 +66,7 @@ async def evaluate(judge_model: Model, df: pd.DataFrame) -> list[tuple[int, int,
 
 class Setting(BaseModel):
     model: ModelName
-    template: GSM8KTemplate | ARCTemplate | LogiQATemplate | GAOKAOTemplate | TimeTablingTemplate
+    template: Template
 
 
 async def main():
