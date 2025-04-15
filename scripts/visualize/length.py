@@ -8,7 +8,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from transformers import AutoTokenizer
 from tortoise import run_async
-from confidence.template import GSM8KTemplate, ARCTemplate, LogiQATemplate
+from confidence.template import ARCTemplate, Template
 from confidence.dataset import DatasetName
 from confidence.logger import Logger
 from confidence.method import MethodName
@@ -17,7 +17,7 @@ from confidence.model import ModelName
 
 class Setting(BaseModel):
     model: ModelName
-    template: GSM8KTemplate | ARCTemplate | LogiQATemplate
+    template: Template
 
 
 async def main():

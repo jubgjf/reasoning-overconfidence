@@ -12,24 +12,14 @@ from confidence.extractor import extract_answer_and_confidence
 from confidence.logger import Logger, list_history_to_dict
 from confidence.method import Method, MethodName, Response
 from confidence.model import Model, ModelName
-from confidence.template import (
-    ARCTemplate,
-    GAOKAOTemplate,
-    GSM8KTemplate,
-    LogiQATemplate,
-    Template,
-    string_to_template,
-    TimeTablingTemplate,
-)
+from confidence.template import Template, string_to_template, TimeTablingTemplate
 from confidence.utils import limit_concurrency, last_git_hash
 
 
 class Argument(Tap):
     model: ModelName = ModelName.QWQ_32B
     dataset: DatasetName = DatasetName.TimeTabling
-    template: GSM8KTemplate | ARCTemplate | LogiQATemplate | GAOKAOTemplate | TimeTablingTemplate = (
-        TimeTablingTemplate.simple
-    )
+    template: Template = TimeTablingTemplate.simple
     method: MethodName = MethodName.Verbal_0_100
     max_samples: int | None = None
     no_cot_memory: bool = False

@@ -1,6 +1,6 @@
 from abc import ABC, ABCMeta, abstractmethod
 from enum import Enum, EnumMeta
-from typing import Type, TypeVar, assert_never
+from typing import Type, assert_never
 
 from .data import ARCData, Data, GAOKAOData, GSM8KData, LogiQAData, TimeTablingData
 
@@ -147,11 +147,11 @@ class TimeTablingTemplate(ITemplate):
             assert_never(self)
 
 
-Template = TypeVar("Template", GSM8KTemplate, ARCTemplate, LogiQATemplate, GAOKAOTemplate, TimeTablingTemplate)
+Template = GSM8KTemplate | ARCTemplate | LogiQATemplate | GAOKAOTemplate | TimeTablingTemplate
 
 
-def string_to_template(string: str) -> GSM8KTemplate | ARCTemplate | LogiQATemplate | GAOKAOTemplate:
-    template_cls = [GSM8KTemplate, ARCTemplate, LogiQATemplate, GAOKAOTemplate]
+def string_to_template(string: str) -> Template:
+    template_cls = [GSM8KTemplate, ARCTemplate, LogiQATemplate, GAOKAOTemplate | TimeTablingTemplate]
     for cls in template_cls:
         for t in cls:
             if t.value == string:
