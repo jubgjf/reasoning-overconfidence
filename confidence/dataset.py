@@ -7,8 +7,8 @@ from typing import Type
 from pydantic import BaseModel
 from typing_extensions import TypeVar
 
-from .data import Data, GSM8KData, ARCData, LogiQAData, GAOKAOData
-from .logger import GSM8KRecord, ARCRecord, LogiQARecord, GAOKAORecord, Record
+from .data import Data, GSM8KData, ARCData, LogiQAData, GAOKAOData, TimeTablingData
+from .logger import GSM8KRecord, ARCRecord, LogiQARecord, GAOKAORecord, Record, TimeTablingRecord
 
 
 class DatasetName(Enum):
@@ -16,7 +16,7 @@ class DatasetName(Enum):
     ARC = "arc"
     LogiQA = "logiqa"
     GAOKAO_Physics = "gaokao_physics"
-    # GPQA_Diamond = "gpqa_diamond"  # TODO
+    TimeTabling = "timetabling"
 
     def __str__(self) -> str:
         return self.value
@@ -28,6 +28,7 @@ class DatasetName(Enum):
             DatasetName.ARC: ARCRecord,
             DatasetName.LogiQA: LogiQARecord,
             DatasetName.GAOKAO_Physics: GAOKAORecord,
+            DatasetName.TimeTabling: TimeTablingRecord,
         }
         return record_cls_map[self]
 
@@ -38,6 +39,7 @@ class DatasetName(Enum):
             DatasetName.ARC: ARCDataset,
             DatasetName.LogiQA: LogiQADataset,
             DatasetName.GAOKAO_Physics: GAOKAODataset,
+            DatasetName.TimeTabling: TimeTablingDataset,
         }
         return dataset_cls_map[self]
 
@@ -115,4 +117,14 @@ class GAOKAODataset(IDataset):
         return GAOKAOData
 
 
-Dataset = TypeVar("Dataset", GSM8KDataset, ARCDataset, LogiQADataset, GAOKAODataset)
+class TimeTablingDataset(IDataset):
+    @property
+    def _name(self) -> DatasetName:
+        return DatasetName.TimeTabling
+
+    @property
+    def _data_cls(self) -> Type[Data]:
+        return TimeTablingData
+
+
+Dataset = TypeVar("Dataset", GSM8KDataset, ARCDataset, LogiQADataset, GAOKAODataset, TimeTablingDataset)
