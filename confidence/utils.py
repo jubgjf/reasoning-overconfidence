@@ -8,6 +8,7 @@ from collections.abc import Coroutine, Sequence
 
 from openai.types.chat import ChatCompletionTokenLogprob
 from result import Err, Ok, Result
+from loguru import logger
 
 
 def limit_concurrency(coroutines: Sequence[Coroutine], concurrency: int) -> list[Coroutine]:
@@ -27,11 +28,7 @@ def last_git_hash() -> str:
 
 
 def gsm8k_postprocess(text: str) -> Result[tuple[str, int, int], str]:
-    if "</think>" in text:
-        thinking_content, answer_content = text.split("</think>")
-        thinking_content += "</think>"
-    else:
-        thinking_content, answer_content = "", text
+    thinking_content, answer_content = split_thinking_answer(text)
 
     # pattern is from https://github.com/open-compass/opencompass/blob/854c6bf025ed53e332ae58a7ee66807eae48618d/opencompass/datasets/gsm8k.py#L44
     pattern = r"-?\d+\.\d+|-?\d+"
@@ -158,9 +155,13 @@ def gaokao_postprocess(text: str, options: str = "ABCD") -> Result[tuple[str, in
 
 
 def split_thinking_answer(text: str) -> tuple[str, str]:
+    if text.count("</think>") > 1:
+        logger.warning(f'text.count("</think>") = {text.count("</think>")}, text = {text}')
+
     if "</think>" in text:
-        thinking_content, answer_content = text.split("</think>")
-        thinking_content += "</think>"
+        splits = text.split("</think>")
+        thinking_content = "</think>".join(splits[:-1]) + "</think>"
+        answer_content = splits[-1]
     else:
         thinking_content, answer_content = "", text
 

@@ -24,6 +24,7 @@ class IRecord(ABC, BaseModel):
     history: dict  # dict[str, str]
     model: str
     ref: str  # Some addition notes, can be empty
+    eval_result: str  # The result of evaluation, can be empty
     git_hash: str
 
 
