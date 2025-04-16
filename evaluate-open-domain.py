@@ -65,8 +65,8 @@ async def main(args: Argument):
     judge_model = Model(args.judge_model)
     record_cls = args.dataset.record_cls
     db_logger = Logger(
-        db_name="debug",
-        table_name=f"{args.dataset}--{args.method}--no-cot-memory-{args.no_cot_memory}--{args.template}--{args.model}",
+        db_name=args.dataset.value,
+        table_name=f"{args.dataset}--{args.method}--no-cot-memory-{args.no_cot_memory}--{args.template}--{args.model}--fake-reflection",
         record_cls=record_cls,
     )
     async with db_logger:
@@ -77,8 +77,8 @@ async def main(args: Argument):
     tasks = limit_concurrency(tasks, args.concurrency)
 
     db_logger = Logger(
-        db_name="debug",
-        table_name=f"{args.dataset}--{args.method}--no-cot-memory-{args.no_cot_memory}--{args.template}--{args.model}--evaluate-by-{args.judge_model}",
+        db_name=args.dataset.value,
+        table_name=f"{args.dataset}--{args.method}--no-cot-memory-{args.no_cot_memory}--{args.template}--{args.model}--fake-reflection--evaluate-by-{args.judge_model}",
         record_cls=record_cls,
     )
     async with db_logger:
