@@ -73,7 +73,7 @@ async def main(args: Argument):
         # {question_id: (data, history), ...}
         dataset_history_pair = {question_id: (dataset[question_id], turn) for question_id, turn in history.items()}
 
-    save_title = f"{args.dataset}--{args.method}--no-cot-memory-{args.no_cot_memory}--{args.template}--{args.model}-fake-reflection"
+    save_title = f"{args.dataset}--{args.method}--no-cot-memory-{args.no_cot_memory}--{args.template}--{args.model}--fake-reflection"
     db_logger = Logger(
         db_name=args.dataset.value if not args.debug else "debug",
         table_name=save_title,
