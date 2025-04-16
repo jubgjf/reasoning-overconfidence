@@ -1,11 +1,12 @@
 import asyncio
 import os
 from enum import Enum
+from functools import partial
 from typing import assert_never
 
 from dotenv import load_dotenv
 from loguru import logger
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, OpenAI
 from openai.types.chat import ChatCompletionTokenLogprob
 from openai.types.completion_choice import Logprobs
 from pydantic import BaseModel
@@ -59,11 +60,11 @@ class CompleteAPIResponse(BaseModel):
 class Model:
     def __init__(self, model_name: ModelName):
         self._model_name = model_name
-        self._client = self._get_client()
+        self._sync_client, self._client = self._get_client()
         self._tokenizer = AutoTokenizer.from_pretrained(self._model_name.hf_name)
 
     @staticmethod
-    def _get_client() -> AsyncOpenAI:
+    def _get_client() -> tuple[OpenAI, AsyncOpenAI]:
         def get_url_and_key() -> tuple[str | None, str | None]:
             return os.getenv("BASE_URL"), os.getenv("API_KEY")
 
@@ -75,7 +76,10 @@ class Model:
         if base_url is None or api_key is None:
             raise ValueError("BASE_URL and API_KEY must be set in environment variables")
 
-        return AsyncOpenAI(base_url=base_url, api_key=api_key, timeout=1800)
+        return (
+            OpenAI(base_url=base_url, api_key=api_key, timeout=1800),
+            AsyncOpenAI(base_url=base_url, api_key=api_key, timeout=1800),
+        )
 
     async def request(
         self,
@@ -116,6 +120,23 @@ class Model:
 
         return response_result
 
+    async def async_complete(
+        self, prompt: str, temperature: float = 0, max_tokens: int = 16384, logprobs: bool = False
+    ):
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None,
+            partial(
+                self._sync_client.completions.create,
+                model=self._model_name.model_id,
+                prompt=prompt,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                logprobs=5 if logprobs else None,
+            ),
+        )
+        return result
+
     async def complete(
         self,
         prompt: str,
@@ -125,13 +146,15 @@ class Model:
     ) -> Result[CompleteAPIResponse, str]:
         async def request_once() -> Result[CompleteAPIResponse, str]:
             try:
-                response = await self._client.completions.create(
-                    model=self._model_name.model_id,
-                    prompt=prompt,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                    logprobs=5 if logprobs else None,
-                )
+                # TODO weird bug, AsyncOpenAI client stuck here
+                # response = await self._client.completions.create(
+                #     model=self._model_name.model_id,
+                #     prompt=prompt,
+                #     temperature=temperature,
+                #     max_tokens=max_tokens,
+                #     logprobs=5 if logprobs else None,
+                # )
+                response = await self.async_complete(prompt, temperature, max_tokens, logprobs)
                 return Ok(
                     CompleteAPIResponse(
                         text_content=response.choices[0].text,

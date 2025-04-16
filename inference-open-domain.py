@@ -119,6 +119,7 @@ async def main(args: Argument):
                 history=list_history_to_dict(history),
                 model=args.model.value,
                 ref="",
+                eval_result="",
                 git_hash=last_git_hash(),
             )
             await db_logger.insert(record)
