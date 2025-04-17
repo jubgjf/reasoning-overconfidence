@@ -3,7 +3,7 @@ import pandas as pd
 import seaborn as sns
 from tortoise import run_async
 
-from confidence.template import LogiQATemplate
+from confidence.template import TimeTablingTemplate
 from confidence.dataset import DatasetName
 from confidence.logger import Logger
 from confidence.method import MethodName
@@ -12,17 +12,19 @@ from confidence.model import ModelName
 
 async def main():
     model = ModelName.QWQ_32B
-    dataset = DatasetName.LogiQA
-    template = LogiQATemplate.CoTEval
+    dataset = DatasetName.TimeTabling
+    template = TimeTablingTemplate.simple
+    no_cot_memory = False
 
-    methods = [MethodName.Verbal_0_100, MethodName.LogProb, MethodName.P_True]
+    methods = [MethodName.Verbal_0_100]
+    # methods = [MethodName.Verbal_0_100, MethodName.LogProb, MethodName.P_True]
 
     records_list = []
     for method in methods:
         record_cls = dataset.record_cls
         db_logger = Logger(
             db_name=dataset.value,
-            table_name=f"{dataset}--{method}--{template}--{model}",
+            table_name=f"{dataset}--{method}--no-cot-memory-{no_cot_memory}--{template}--{model}",
             record_cls=record_cls,
         )
         async with db_logger:
