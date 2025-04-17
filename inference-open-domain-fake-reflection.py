@@ -1,7 +1,6 @@
 import asyncio
 
 from loguru import logger
-from result import Result
 from tap import Tap
 from tortoise import run_async
 from tqdm.auto import tqdm
@@ -13,7 +12,7 @@ from confidence.logger import Logger, list_history_to_dict
 from confidence.method import Method, MethodName, Response
 from confidence.model import Model, ModelName
 from confidence.template import Template, string_to_template, TimeTablingTemplate
-from confidence.utils import limit_concurrency, last_git_hash, split_thinking_answer
+from confidence.utils import limit_concurrency, last_git_hash, split_thinking_answer, flatten
 
 
 class Argument(Tap):
@@ -28,26 +27,6 @@ class Argument(Tap):
 
     def configure(self) -> None:
         self.add_argument("--template", type=string_to_template)
-
-
-async def request(
-    method: Method,
-    model: Model,
-    template: Template,
-    data: Data,
-    history_thinking_content: str,
-    no_cot_memory: bool = False,
-) -> tuple[Data, Result[list[Response], str]]:
-    response_results = await method.request_fake_reflection(
-        model,
-        data,
-        template,
-        temperature=0.2,
-        history_thinking_content=history_thinking_content,
-        max_tokens=16384,
-        no_cot_memory=no_cot_memory,
-    )
-    return data, response_results
 
 
 async def main(args: Argument):
@@ -89,61 +68,63 @@ async def main(args: Argument):
 
         # ===== task =====
         tasks = [
-            request(
-                method=method,
+            method.build_fake_reflection_requests(
                 model=model,
-                template=args.template,
                 data=data,
+                template=args.template,
+                temperature=0.2,
                 history_thinking_content=split_thinking_answer(turn["assistant_0"])[0],
+                max_tokens=16384,
                 no_cot_memory=args.no_cot_memory,
             )
             for data, turn in dataset_history_pair.values()
         ]
+        tasks = flatten(tasks)
         tasks = limit_concurrency(tasks, args.concurrency)
 
-        async for zip_response in tqdm(asyncio.as_completed(tasks), total=len(tasks), desc=save_title):
-            data: Data
-            response_results: Result[list[Response], str]
-            data, response_results = await zip_response
-
-            if response_results.is_err():
-                logger.error(response_results.err_value)
+        async for zip_response_result in tqdm(asyncio.as_completed(tasks), total=len(tasks), desc=save_title):
+            zip_response_result = await zip_response_result
+            if zip_response_result.is_err():
+                logger.error(zip_response_result.err_value)
                 continue
 
-            for i, response_result in enumerate(response_results.ok_value):
-                history, turn_0, turn_1 = (
-                    response_result.history,
-                    response_result.turn_0,
-                    response_result.turn_1,
-                )
-                assert history[-1]["role"] == "assistant"
-                answer_and_confidence_result = extract_answer_and_confidence(
-                    method_name=args.method,
-                    dataset_name=args.dataset,
-                    question_turn=turn_0,
-                    confidence_turn=turn_1,
-                )
-                if answer_and_confidence_result.is_err():
-                    logger.error(answer_and_confidence_result.err_value)
-                    continue
+            data: Data
+            response_result: Response
+            data, response_result = zip_response_result.ok_value
 
-                model_answer_extracted, confidence_extracted = answer_and_confidence_result.ok_value
-                record = record_cls(
-                    **data.model_dump(),
-                    model_thinking_response=turn_0.thinking_content,
-                    model_answer_response=turn_0.answer_content,
-                    model_answer_extracted=model_answer_extracted,
-                    model_confidence_response=turn_1.answer_content if turn_1 is not None else "",
-                    model_confidence_extracted=confidence_extracted,
-                    template=args.template.value,
-                    method=args.method.value,
-                    history=list_history_to_dict(history),
-                    model=args.model.value,
-                    ref=f"{data.question_id}--variant{i}",
-                    eval_result="",
-                    git_hash=last_git_hash(),
-                )
-                await db_logger.insert(record)
+            history, turn_0, turn_1 = (
+                response_result.history,
+                response_result.turn_0,
+                response_result.turn_1,
+            )
+            assert history[-1]["role"] == "assistant"
+            answer_and_confidence_result = extract_answer_and_confidence(
+                method_name=args.method,
+                dataset_name=args.dataset,
+                question_turn=turn_0,
+                confidence_turn=turn_1,
+            )
+            if answer_and_confidence_result.is_err():
+                logger.error(answer_and_confidence_result.err_value)
+                continue
+
+            model_answer_extracted, confidence_extracted = answer_and_confidence_result.ok_value
+            record = record_cls(
+                **data.model_dump(),
+                model_thinking_response=turn_0.thinking_content,
+                model_answer_response=turn_0.answer_content,
+                model_answer_extracted=model_answer_extracted,
+                model_confidence_response=turn_1.answer_content if turn_1 is not None else "",
+                model_confidence_extracted=confidence_extracted,
+                template=args.template.value,
+                method=args.method.value,
+                history=list_history_to_dict(history),
+                model=args.model.value,
+                ref=f"{data.question_id}--variant",
+                eval_result="",
+                git_hash=last_git_hash(),
+            )
+            await db_logger.insert(record)
 
 
 if __name__ == "__main__":

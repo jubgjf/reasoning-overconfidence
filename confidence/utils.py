@@ -232,3 +232,10 @@ def split_thinking_answer_logprobs(
         return thinking_logprobs, answer_logprobs
     else:
         assert_never(logprobs)
+
+
+def flatten[T](ll: list[list[T]]) -> list[T]:
+    flattened = []
+    for l in ll:
+        flattened.extend(l)
+    return flattened

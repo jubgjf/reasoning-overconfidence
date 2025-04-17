@@ -1,7 +1,6 @@
-import asyncio
 import re
 from enum import Enum
-from typing import assert_never
+from typing import assert_never, Any, Coroutine
 
 from loguru import logger
 from openai.types.chat import ChatCompletionTokenLogprob
@@ -151,7 +150,71 @@ class Method:
         assert len(messages) == 4
         return Ok(Response(history=messages, turn_0=turn_0, turn_1=turn_1))
 
-    async def request_fake_reflection(
+    async def _request_fake_reflection(
+        self,
+        model: Model,
+        user_input: str,
+        prompt: str,
+        data: Data,
+        template: Template,
+        temperature: float = 0,
+        max_tokens: int = 16384,
+        no_cot_memory: bool = False,
+    ) -> Result[tuple[Data, Response], str]:
+        # ===== First turn =====
+        response_result: Result[CompleteAPIResponse, str]
+        response_result = await model.complete(
+            prompt=prompt, max_tokens=max_tokens, temperature=temperature, logprobs=self._name.need_logprobs
+        )
+        if response_result.is_err():
+            return Err(f"Found err in fake reflection completion: {response_result.err_value}")
+
+        messages = [{"role": "user", "content": template.prompt(data)}]
+
+        model_output = (prompt + response_result.ok_value.text_content)[len(user_input) :]
+        messages.append({"role": "assistant", "content": model_output})
+
+        thinking_content, answer_content = split_thinking_answer(model_output)
+        thinking_logprobs, answer_logprobs = split_thinking_answer_logprobs(response_result.ok_value.logprobs_content)
+        self._validate_text_vs_tokens(thinking_content, thinking_logprobs)
+        self._validate_text_vs_tokens(answer_content, answer_logprobs)
+
+        turn_0 = CompleteResponsePerTurn(
+            thinking_content=thinking_content,
+            answer_content=answer_content,
+            thinking_logprobs=thinking_logprobs.copy() if thinking_logprobs is not None else None,
+            answer_logprobs=answer_logprobs.copy() if answer_logprobs is not None else None,
+        )
+        if not self._name.need_another_turn:
+            assert len(messages) == 2
+            return Ok((data, Response(history=messages, turn_0=turn_0, turn_1=None)))
+
+        # ===== Second turn (Optional) =====
+        if no_cot_memory:
+            messages[1]["content"] = answer_content
+        messages.append({"role": "user", "content": self._name.prompt})
+        response_result = await model.request(
+            messages=messages, temperature=temperature, max_tokens=max_tokens, logprobs=self._name.need_logprobs
+        )
+        if response_result.is_err():
+            return response_result
+        messages.append({"role": "assistant", "content": response_result.ok_value.message_content})
+
+        thinking_content, answer_content = split_thinking_answer(response_result.ok_value.message_content)
+        thinking_logprobs, answer_logprobs = split_thinking_answer_logprobs(response_result.ok_value.logprobs_content)
+        self._validate_text_vs_tokens(thinking_content, thinking_logprobs)
+        self._validate_text_vs_tokens(answer_content, answer_logprobs)
+
+        turn_1 = ChatResponsePerTurn(
+            thinking_content=thinking_content,
+            answer_content=answer_content,
+            thinking_logprobs=thinking_logprobs.copy() if thinking_logprobs is not None else None,
+            answer_logprobs=answer_logprobs.copy() if answer_logprobs is not None else None,
+        )
+        assert len(messages) == 4
+        return Ok((data, Response(history=messages, turn_0=turn_0, turn_1=turn_1)))
+
+    def build_fake_reflection_requests(
         self,
         model: Model,
         data: Data,
@@ -160,7 +223,7 @@ class Method:
         temperature: float = 0,
         max_tokens: int = 16384,
         no_cot_memory: bool = False,
-    ) -> Result[list[Response], str]:
+    ) -> list[Coroutine[Any, Any, Result[tuple[Data, Response], str]]]:
         reflection_patterns = [
             r"^Wait,.*\n\n",
             r"^Let me double-check.*\n\n",
@@ -188,74 +251,21 @@ class Method:
         for i in range(0, len(thinking_steps_by_reflection), 2):
             thinking_with_reduced_reflection.append(thinking_steps_by_reflection[: i + 1])
 
-        # ===== First turn =====
         user_input = model.apply_chat_template([{"role": "user", "content": template.prompt(data)}])
         user_input_with_thinking = [user_input + "".join(steps) for steps in thinking_with_reduced_reflection]
         user_input_with_thinking = [
             im if im.endswith("</think>") else im + "</think>" for im in user_input_with_thinking
         ]
-        tasks = [
-            model.complete(
-                prompt=prompt, max_tokens=max_tokens, temperature=temperature, logprobs=self._name.need_logprobs
+        return [
+            self._request_fake_reflection(
+                model=model,
+                user_input=user_input,
+                prompt=prompt,
+                data=data,
+                template=template,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                no_cot_memory=no_cot_memory,
             )
             for prompt in user_input_with_thinking
         ]
-        response_results: list[Result[CompleteAPIResponse, str]] = await asyncio.gather(*tasks)
-
-        for response_result in response_results:
-            if response_result.is_err():
-                return Err(f"Found err in fake reflection completion: {response_result.err_value}")
-
-        returns = []
-        for prompt, response_result in zip(user_input_with_thinking, response_results):
-            messages = [{"role": "user", "content": template.prompt(data)}]
-
-            model_output = (prompt + response_result.ok_value.text_content)[len(user_input) :]
-            messages.append({"role": "assistant", "content": model_output})
-
-            thinking_content, answer_content = split_thinking_answer(model_output)
-            thinking_logprobs, answer_logprobs = split_thinking_answer_logprobs(
-                response_result.ok_value.logprobs_content
-            )
-            self._validate_text_vs_tokens(thinking_content, thinking_logprobs)
-            self._validate_text_vs_tokens(answer_content, answer_logprobs)
-
-            turn_0 = CompleteResponsePerTurn(
-                thinking_content=thinking_content,
-                answer_content=answer_content,
-                thinking_logprobs=thinking_logprobs.copy() if thinking_logprobs is not None else None,
-                answer_logprobs=answer_logprobs.copy() if answer_logprobs is not None else None,
-            )
-            if not self._name.need_another_turn:
-                assert len(messages) == 2
-                returns.append(Response(history=messages, turn_0=turn_0, turn_1=None))
-                break
-
-            # ===== Second turn (Optional) =====
-            if no_cot_memory:
-                messages[1]["content"] = answer_content
-            messages.append({"role": "user", "content": self._name.prompt})
-            response_result = await model.request(
-                messages=messages, temperature=temperature, max_tokens=max_tokens, logprobs=self._name.need_logprobs
-            )
-            if response_result.is_err():
-                return response_result
-            messages.append({"role": "assistant", "content": response_result.ok_value.message_content})
-
-            thinking_content, answer_content = split_thinking_answer(response_result.ok_value.message_content)
-            thinking_logprobs, answer_logprobs = split_thinking_answer_logprobs(
-                response_result.ok_value.logprobs_content
-            )
-            self._validate_text_vs_tokens(thinking_content, thinking_logprobs)
-            self._validate_text_vs_tokens(answer_content, answer_logprobs)
-
-            turn_1 = ChatResponsePerTurn(
-                thinking_content=thinking_content,
-                answer_content=answer_content,
-                thinking_logprobs=thinking_logprobs.copy() if thinking_logprobs is not None else None,
-                answer_logprobs=answer_logprobs.copy() if answer_logprobs is not None else None,
-            )
-            assert len(messages) == 4
-            returns.append(Response(history=messages, turn_0=turn_0, turn_1=turn_1))
-
-        return Ok(returns)
