@@ -38,7 +38,7 @@ async def request(
     history_thinking_content: str,
     no_cot_memory: bool = False,
 ) -> tuple[Data, Result[list[Response], str]]:
-    response_results = await method.request_fake_reflection(
+    response_results = await method.build_fake_reflection_requests(
         model,
         data,
         template,
