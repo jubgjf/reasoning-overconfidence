@@ -2,7 +2,6 @@ import re
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
-from scipy import stats
 from tortoise import run_async
 
 from confidence.dataset import DatasetName
@@ -45,6 +44,7 @@ def count_reflections(history_thinking_content: str) -> int:
 
 async def main():
     model = ModelName.QWQ_32B
+    judge_model = ModelName.QWQ_32B
     dataset = DatasetName.TimeTabling
     template = TimeTablingTemplate.simple
     method = MethodName.Verbal_0_100
@@ -53,26 +53,26 @@ async def main():
     records_list = []
 
     # ===== original =====
-    record_cls = dataset.record_cls
-    db_logger = Logger(
-        db_name=dataset.value,
-        table_name=f"{dataset}--{method}--no-cot-memory-{no_cot_memory}--{template}--{model}",
-        record_cls=record_cls,
-    )
-    async with db_logger:
-        records = await db_logger.fetch()
-    method_records = [record.model_dump() for record in records]
-    df = pd.DataFrame(method_records)
-    if method == MethodName.Verbal_0_100:
-        df["model_confidence_extracted"] = df["model_confidence_extracted"].apply(lambda x: x / 100)
-    df["reflection_times"] = df["model_thinking_response"].apply(count_reflections)
-    records_list.append(df)
+    # record_cls = dataset.record_cls
+    # db_logger = Logger(
+    #     db_name=dataset.value,
+    #     table_name=f"{dataset}--{method}--no-cot-memory-{no_cot_memory}--{template}--{model}",
+    #     record_cls=record_cls,
+    # )
+    # async with db_logger:
+    #     records = await db_logger.fetch()
+    # method_records = [record.model_dump() for record in records]
+    # df = pd.DataFrame(method_records)
+    # if method == MethodName.Verbal_0_100:
+    #     df["model_confidence_extracted"] = df["model_confidence_extracted"].apply(lambda x: x / 100)
+    # df["reflection_times"] = df["model_thinking_response"].apply(count_reflections)
+    # records_list.append(df)
 
     # ===== no reflection =====
     record_cls = dataset.record_cls
     db_logger = Logger(
         db_name=dataset.value,
-        table_name=f"{dataset}--{method}--no-cot-memory-{no_cot_memory}--{template}--{model}--fake-reflection",
+        table_name=f"{dataset}--{method}--no-cot-memory-{no_cot_memory}--{template}--{model}--fake-reflection--evaluate-by-{judge_model}",
         record_cls=record_cls,
     )
     async with db_logger:
@@ -81,54 +81,39 @@ async def main():
     df = pd.DataFrame(method_records)
     if method == MethodName.Verbal_0_100:
         df["model_confidence_extracted"] = df["model_confidence_extracted"].apply(lambda x: x / 100)
+
     df["reflection_times"] = df["model_thinking_response"].apply(count_reflections)
+    df["correct_solution_count"] = df["eval_result"].apply(lambda x: int(x.split("/")[0]))
+    df["total_solution_count"] = df["eval_result"].apply(lambda x: int(x.split("/")[1]))
+    df["model__template"] = df["model"] + "--" + df["template"]
     records_list.append(df)
 
     df = pd.concat(records_list, ignore_index=True)
-
-    spearman_corr = df["reflection_times"].corr(df["model_confidence_extracted"], method="spearman")
-    print(f"Spearman correlation coefficient: {spearman_corr:.4f}")
-
-    top_5_questions = df["question_id"].value_counts().nlargest(5).index
-    df_top_5 = df[df["question_id"].isin(top_5_questions)]
+    df = df[df["correct_solution_count"] < 100]
+    df = df[df["total_solution_count"] < 100]
 
     plt.figure(figsize=(12, 8))
-    sns.scatterplot(
-        data=df_top_5, x="reflection_times", y="model_confidence_extracted", hue="question_id", palette="viridis"
-    )
-    plt.xlabel("Reflection Times")
-    plt.ylabel("Model Confidence")
-    plt.legend(title="Question ID")
-    plt.title(f"Reflection Times vs. Model Confidence\nSpearman Correlation: {spearman_corr:.4f}")
-    plt.show()
-
-    df["has_reflection"] = df["reflection_times"] > 0
-    plt.figure(figsize=(5, 8))
-    sns.boxplot(data=df, x="has_reflection", y="model_confidence_extracted", hue="has_reflection")
+    sns.lineplot(data=df, x="model_confidence_extracted", y="correct_solution_count", hue="model__template")
     plt.xlabel("Model Confidence")
-    plt.ylabel("Density")
-    plt.title("Model Confidence Distribution without Reflections")
+    plt.ylabel("Correct Solution Count")
+    plt.title("Reflection Times vs. Correct Solution Count")
     plt.show()
 
-    confidence_with_reflection = df[df["has_reflection"]]["model_confidence_extracted"]
-    confidence_without_reflection = df[~df["has_reflection"]]["model_confidence_extracted"]
+    spearman_corr = df["reflection_times"].corr(df["correct_solution_count"], method="spearman")
+    plt.figure(figsize=(12, 8))
+    sns.scatterplot(data=df, x="reflection_times", y="correct_solution_count")
+    plt.xlabel("Reflection Times")
+    plt.ylabel("Correct Solution Count")
+    plt.title(f"Reflection Times vs. Correct Solution Count\nSpearman correlation coefficient: {spearman_corr:.4f}")
+    plt.show()
 
-    # 正态性检验
-    _, p_with_reflection = stats.shapiro(confidence_with_reflection)
-    _, p_without_reflection = stats.shapiro(confidence_without_reflection)
-
-    # 方差齐性检验
-    _, p_levene = stats.levene(confidence_with_reflection, confidence_without_reflection)
-
-    # 根据检验结果选择合适的统计检验方法
-    if p_with_reflection > 0.05 and p_without_reflection > 0.05 and p_levene > 0.05:
-        # 数据满足正态性和方差齐性，使用独立样本 t 检验
-        t_stat, p_t = stats.ttest_ind(confidence_with_reflection, confidence_without_reflection)
-        print(f"独立样本 t 检验: t = {t_stat:.4f}, p = {p_t:.4f}")
-    else:
-        # 数据不满足条件，使用 Mann - Whitney U 检验
-        u_stat, p_u = stats.mannwhitneyu(confidence_with_reflection, confidence_without_reflection)
-        print(f"Mann - Whitney U 检验: U = {u_stat:.4f}, p = {p_u:.4f}")
+    spearman_corr = df["reflection_times"].corr(df["total_solution_count"], method="spearman")
+    plt.figure(figsize=(12, 8))
+    sns.scatterplot(data=df, x="reflection_times", y="total_solution_count")
+    plt.xlabel("Reflection Times")
+    plt.ylabel("Total Solution Count")
+    plt.title(f"Reflection Times vs. Total Solution Count\nSpearman correlation coefficient: {spearman_corr:.4f}")
+    plt.show()
 
 
 if __name__ == "__main__":
