@@ -34,7 +34,8 @@ class GAOKAOData(BaseModel):
 class TimeTablingData(BaseModel):
     question_id: int
     question: str
-    answer_example: str
+    answers: dict[str, str]
+    answer_count: int
 
 
 Data = TypeVar("Data", GSM8KData, ARCData, LogiQAData, GAOKAOData, TimeTablingData)

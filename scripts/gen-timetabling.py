@@ -1,101 +1,168 @@
 import json
+import matplotlib.pyplot as plt
+import seaborn as sns
 import random
+from itertools import product
 
 from confidence.data import TimeTablingData
 
 
-def gen_timetabling() -> tuple[str, str]:
-    generated_question = ""
-    answer_example = ""
+def generate_problem():
+    """生成一个保证存在可行解的排课问题"""
+    n_courses = 10
+    n_teachers = 5
+    n_times = 10
+    n_rooms = 10
 
-    # 定义基本参数
-    num_courses = 5  # 课程数量
-    num_teachers = 3  # 教师数量
-    num_students = 30  # 学生数量
-    num_rooms = 2  # 教室数量
-    num_time_slots = 3  # 可用时间段数量
-    room_capacities = [20, 15]  # 每个教室的容量
+    # 生成基础可行解
+    solution = {}
+    used_tr = set()  # 已占用的 (时间, 教室)
+    used_tt = set()  # 已占用的 (教师, 时间)
+    course_options = {}
 
-    # 随机生成课程，教师，学生，和时间段的分配
-    courses = [f"Course{i}" for i in range(1, num_courses + 1)]
-    teachers = [f"Teacher{i}" for i in range(1, num_teachers + 1)]
-    students = [f"Student{i}" for i in range(1, num_students + 1)]
-    rooms = [f"Room{i}" for i in range(1, num_rooms + 1)]
-    time_slots = [f"TimeSlot{i}" for i in range(1, num_time_slots + 1)]
+    for course in range(n_courses):
+        while True:
+            time = random.randint(0, n_times - 1)
+            room = random.randint(0, n_rooms - 1)
+            teacher = random.randint(0, n_teachers - 1)
+            if (time, room) not in used_tr and (teacher, time) not in used_tt:
+                # 记录可行解
+                solution[f"Course{course}"] = {"time": time, "room": room, "teacher": teacher}
+                used_tr.add((time, room))
+                used_tt.add((teacher, time))
+                # 生成课程选项（至少包含可行解的值，并随机扩展）
+                possible_times = [time]
+                if random.random() < 0.5 and time + 1 < n_times:
+                    possible_times.append(time + 1)
+                possible_rooms = [room]
+                possible_teachers = [teacher]
+                course_options[f"Course{course}"] = {
+                    "times": possible_times,
+                    "rooms": possible_rooms,
+                    "teachers": possible_teachers,
+                }
+                break
+    return course_options, solution
 
-    # 随机分配每门课程给教师
-    course_teacher_mapping = {}
-    for course in courses:
-        course_teacher_mapping[course] = random.choice(teachers)
 
-    # 随机分配每门课程给学生（每个学生选修随机课程）
-    student_course_mapping = {}
-    for student in students:
-        student_course_mapping[student] = random.sample(courses, random.randint(1, 3))  # 每个学生选修1到3门课程
+def find_all_solutions(course_options):
+    """遍历所有可能组合，返回满足约束的解"""
+    course_list = []
+    for course in course_options:
+        co = course_options[course]
+        assignments = []
+        for t in co["times"]:
+            for r in co["rooms"]:
+                for p in co["teachers"]:
+                    assignments.append({"course": course, "time": t, "room": r, "teacher": p})
+        course_list.append(assignments)
 
-    # 随机分配每门课程一个教室和时间段
-    course_schedule = {}
-    for course in courses:
-        course_schedule[course] = {
-            "teacher": course_teacher_mapping[course],
-            "room": random.choice(rooms),
-            "time_slot": random.choice(time_slots),
-        }
+    all_combinations = product(*course_list)
+    solutions = []
 
-    # 打印出生成的排课信息
-    generated_question += "Courses schedule:\n"
-    for course, schedule in course_schedule.items():
-        generated_question += (
-            f"{course}: Teacher={schedule['teacher']}, Room={schedule['room']}, TimeSlot={schedule['time_slot']}\n"
+    for combo in all_combinations:
+        time_room = set()
+        teacher_time = set()
+        valid = True
+        for assign in combo:
+            t = assign["time"]
+            r = assign["room"]
+            p = assign["teacher"]
+            if (t, r) in time_room or (p, t) in teacher_time:
+                valid = False
+                break
+            time_room.add((t, r))
+            teacher_time.add((p, t))
+        if valid:
+            solutions.append(combo)
+    return solutions
+
+
+with open("./dataset/timetabling.jsonl", "w") as f:
+    question_id, max_questions_per_bin = 0, 10
+    solution_bin = {
+        "0": [],  #  0-10,
+        "1": [],  # 10-20,
+        "2": [],  # 20-30,
+        "3": [],  # 30-40,
+        "4": [],  # 40-50,
+        "5": [],  # 50-60,
+        "6": [],  # 60-70,
+        "7": [],  # 70-80,
+        "8": [],  # 80-90,
+        "9": [],  # 90-100,
+    }
+    while True:
+        course_options, _ = generate_problem()
+        all_solutions = find_all_solutions(course_options)
+
+        question = "Constraints:\n"
+        for course in course_options:
+            opts = course_options[course]
+            question += f"- {course} : Time {opts['times']}, Room {opts['rooms']}, Teacher {opts['teachers']}\n"
+        question += "- Multiple courses cannot be scheduled in the same time slot and room.\n"
+        question += "- A teacher can only teach one course at a time.\n"
+
+        answers = f"Total {len(all_solutions)} solutions\n\n"
+        for idx, sol in enumerate(all_solutions, 1):
+            answers += f"Solution {idx}:\n"
+            answers += "| Course  | Time  | Room  | Teacher  |\n"
+            answers += "|---------|-------|-------|----------|\n"
+            for assign in sol:
+                answers += f"| {assign['course']} | T{assign['time']}    | R{assign['room']}    | P{assign['teacher']}       |\n"
+            answers += "\n"
+
+        data = TimeTablingData(
+            question_id=question_id, question=question, answers={"0": answers}, answer_count=len(all_solutions)
         )
-    generated_question += "\n"
 
-    # 生成约束条件
-    constraints = []
+        if 0 < len(all_solutions) < 10:
+            solution_bin["0"].append(data)
+        elif 10 < len(all_solutions) < 20:
+            solution_bin["1"].append(data)
+        elif 20 < len(all_solutions) < 30:
+            solution_bin["2"].append(data)
+        elif 30 < len(all_solutions) < 40:
+            solution_bin["3"].append(data)
+        elif 40 < len(all_solutions) < 50:
+            solution_bin["4"].append(data)
+        elif 50 < len(all_solutions) < 60:
+            solution_bin["5"].append(data)
+        elif 60 < len(all_solutions) < 70:
+            solution_bin["6"].append(data)
+        elif 70 < len(all_solutions) < 80:
+            solution_bin["7"].append(data)
+        elif 80 < len(all_solutions) < 90:
+            solution_bin["8"].append(data)
+        elif 90 < len(all_solutions) < 100:
+            solution_bin["9"].append(data)
+        else:
+            pass
 
-    # 确保每门课程都有安排
-    for course in courses:
-        constraints.append(f"{course} must be scheduled at some time slot and room.")
+        can_break = True
+        for solutions in solution_bin.values():
+            if len(solutions) < max_questions_per_bin:
+                can_break = False
+        if can_break:
+            print("-------------")
+            print({k: len(v) for k, v in solution_bin.items()})
+            break
 
-    # 确保每个教师在每个时间段只安排一门课程
-    for teacher in teachers:
-        constraints.append(f"{teacher} can only teach one course at a time.")
+        print({k: len(v) for k, v in solution_bin.items()})
 
-    # 确保每个教室的学生数量不超过教室容量
-    for room, capacity in zip(rooms, room_capacities):
-        enrolled_students_in_room = [
-            student
-            for student, courses in student_course_mapping.items()
-            if any(course_schedule[course]["room"] == room for course in courses)
-        ]
-        constraints.append(
-            f"Room {room} can accommodate up to {capacity} students. Current enrollment: {len(enrolled_students_in_room)} students."
-        )
+    question_id = 0
+    for solutions in solution_bin.values():
+        solutions = solutions[:max_questions_per_bin]
+        for solution in solutions:
+            solution.question_id = question_id
+            f.write(json.dumps(solution.model_dump(), ensure_ascii=False) + "\n")
+            question_id += 1
 
-    # 确保每个学生在不同课程的时间段不会冲突
-    for student, enrolled_courses in student_course_mapping.items():
-        for i, course1 in enumerate(enrolled_courses):
-            for course2 in enrolled_courses[i + 1 :]:
-                if course_schedule[course1]["time_slot"] == course_schedule[course2]["time_slot"]:
-                    constraints.append(f"{student} cannot have {course1} and {course2} at the same time.")
-
-    # 输出约束条件
-    generated_question += "Constraints:\n"
-    for constraint in constraints:
-        generated_question += constraint + "\n"
-
-    # 可行解输出（部分）
-    for course, schedule in course_schedule.items():
-        answer_example += (
-            f"{course} is scheduled in {schedule['room']} at {schedule['time_slot']} with {schedule['teacher']}."
-        )
-
-    return generated_question, answer_example
-
-
-if __name__ == "__main__":
-    with open("./dataset/timetabling.jsonl", "w") as f:
-        for i in range(200):
-            q, a = gen_timetabling()
-            data = TimeTablingData(question_id=i, question=q, answer_example=a)
-            f.write(json.dumps(data.model_dump(), ensure_ascii=False) + "\n")
+with open("./dataset/timetabling.jsonl") as f:
+    dataset = [json.loads(line) for line in f.readlines()]
+answer_counts = [data["answer_count"] for data in dataset]
+sns.histplot(answer_counts, bins=10)
+plt.xlabel("Number of Solutions")
+plt.ylabel("Frequency")
+plt.title("Distribution of Number of Solutions")
+plt.show()
