@@ -1,3 +1,4 @@
+import random
 import re
 from enum import Enum
 from typing import assert_never, Any, Coroutine
@@ -214,7 +215,7 @@ class Method:
         assert len(messages) == 4
         return Ok((data, Response(history=messages, turn_0=turn_0, turn_1=turn_1)))
 
-    def build_fake_reflection_requests(
+    def build_less_reflection_requests(
         self,
         model: Model,
         data: Data,
@@ -268,4 +269,41 @@ class Method:
                 no_cot_memory=no_cot_memory,
             )
             for prompt in user_input_with_thinking
+        ]
+
+    def build_more_reflection_requests(
+        self,
+        model: Model,
+        data: Data,
+        template: Template,
+        history_thinking_content: str,
+        temperature: float = 0,
+        max_tokens: int = 16384,
+        no_cot_memory: bool = False,
+    ) -> list[Coroutine[Any, Any, Result[tuple[Data, Response], str]]]:
+        if not history_thinking_content.endswith("</think>"):
+            logger.warning("History thinking content does not end with </think>, skip")
+
+        # Insert a random reflection pattern before </think>
+        reflection_patterns = [
+            "Wait,",
+            "Let me double-check.",
+            "Let me think again.",
+        ]
+        history_thinking_content = history_thinking_content[: -len("</think>")]
+        history_thinking_content += "\n" + random.choice(reflection_patterns)
+
+        user_input = model.apply_chat_template([{"role": "user", "content": template.prompt(data)}])
+        user_input_with_thinking = user_input + history_thinking_content
+        return [
+            self._request_fake_reflection(
+                model=model,
+                user_input=user_input,
+                prompt=user_input_with_thinking,
+                data=data,
+                template=template,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                no_cot_memory=no_cot_memory,
+            )
         ]

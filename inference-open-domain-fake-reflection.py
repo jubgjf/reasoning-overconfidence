@@ -1,4 +1,5 @@
 import asyncio
+from enum import Enum
 
 from loguru import logger
 from tap import Tap
@@ -15,11 +16,17 @@ from confidence.template import Template, string_to_template, TimeTablingTemplat
 from confidence.utils import limit_concurrency, last_git_hash, split_thinking_answer, flatten
 
 
+class FakeType(Enum):
+    less = "less"
+    more = "more"
+
+
 class Argument(Tap):
     model: ModelName = ModelName.QWQ_32B
     dataset: DatasetName = DatasetName.TimeTabling
     template: Template = TimeTablingTemplate.simple
     method: MethodName = MethodName.Verbal_0_100
+    fake_type: FakeType = FakeType.less
     no_cot_memory: bool = False
     force_update: bool = False
     concurrency: int = 5
@@ -52,7 +59,7 @@ async def main(args: Argument):
         # {question_id: (data, history), ...}
         dataset_history_pair = {question_id: (dataset[question_id], turn) for question_id, turn in history.items()}
 
-    save_title = f"{args.dataset}--{args.method}--no-cot-memory-{args.no_cot_memory}--{args.template}--{args.model}--fake-reflection"
+    save_title = f"{args.dataset}--{args.method}--no-cot-memory-{args.no_cot_memory}--{args.template}--{args.model}--{args.fake_type}-reflection"
     db_logger = Logger(
         db_name=args.dataset.value if not args.debug else "debug",
         table_name=save_title,
@@ -65,10 +72,15 @@ async def main(args: Argument):
 
         # ===== method =====
         method = Method(name=args.method)
+        request_builder = (
+            method.build_less_reflection_requests
+            if args.fake_type == FakeType.less
+            else method.build_more_reflection_requests
+        )
 
         # ===== task =====
         tasks = [
-            method.build_fake_reflection_requests(
+            request_builder(
                 model=model,
                 data=data,
                 template=args.template,
