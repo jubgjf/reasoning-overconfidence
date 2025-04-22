@@ -20,6 +20,9 @@ class FakeType(Enum):
     less = "less"
     more = "more"
 
+    def __str__(self) -> str:
+        return self.value
+
 
 class Argument(Tap):
     model: ModelName = ModelName.QWQ_32B
