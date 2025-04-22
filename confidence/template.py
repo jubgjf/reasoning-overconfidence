@@ -142,7 +142,7 @@ class TimeTablingTemplate(ITemplate):
         if self == self.simple:
             return f"{data.question}\nPlease provide all feasible schedules that satisfies all constraints one by one."
         elif self == self.cot:
-            return f"{data.question}\nPlease provide all feasible schedules that satisfies all constraints. Think step by step before answering."
+            return f"{data.question}\nPlease provide all feasible schedules that satisfies all constraints one by one. Think step by step before answering."
         else:
             assert_never(self)
 
