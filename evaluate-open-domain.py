@@ -1,4 +1,5 @@
 import asyncio
+from enum import Enum
 
 from loguru import logger
 
@@ -16,12 +17,18 @@ from confidence.method import MethodName
 from confidence.model import ModelName, Model
 
 
+class FakeType(Enum):
+    less = "less"
+    more = "more"
+
+
 class Argument(Tap):
     model: ModelName = ModelName.QWQ_32B
     judge_model: ModelName = ModelName.QWQ_32B
     dataset: DatasetName = DatasetName.TimeTabling
     template: Template = TimeTablingTemplate.simple
     method: MethodName = MethodName.Verbal_0_100
+    fake_type: FakeType = FakeType.less
     no_cot_memory: bool = False
     concurrency: int = 200
     debug: bool = False
@@ -66,7 +73,7 @@ async def main(args: Argument):
     record_cls = args.dataset.record_cls
     db_logger = Logger(
         db_name=args.dataset.value if not args.debug else "debug",
-        table_name=f"{args.dataset}--{args.method}--no-cot-memory-{args.no_cot_memory}--{args.template}--{args.model}--fake-reflection",
+        table_name=f"{args.dataset}--{args.method}--no-cot-memory-{args.no_cot_memory}--{args.template}--{args.model}--{args.fake_type}-reflection",
         record_cls=record_cls,
     )
     async with db_logger:
@@ -78,7 +85,7 @@ async def main(args: Argument):
 
     db_logger = Logger(
         db_name=args.dataset.value if not args.debug else "debug",
-        table_name=f"{args.dataset}--{args.method}--no-cot-memory-{args.no_cot_memory}--{args.template}--{args.model}--fake-reflection--evaluate-by-{args.judge_model}",
+        table_name=f"{args.dataset}--{args.method}--no-cot-memory-{args.no_cot_memory}--{args.template}--{args.model}--{args.fake_type}-reflection--evaluate-by-{args.judge_model}",
         record_cls=record_cls,
     )
     async with db_logger:
