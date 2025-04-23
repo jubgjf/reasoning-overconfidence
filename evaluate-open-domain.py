@@ -20,6 +20,7 @@ from confidence.model import ModelName, Model
 class FakeType(Enum):
     less = "less"
     more = "more"
+    none = "none"
 
     def __str__(self) -> str:
         return self.value
@@ -74,9 +75,13 @@ async def evaluate(judge_model: Model, record: dict) -> Result[tuple[int, int, d
 async def main(args: Argument):
     judge_model = Model(args.judge_model)
     record_cls = args.dataset.record_cls
+    if args.fake_type != FakeType.none:
+        table_name = f"{args.dataset}--{args.method}--no-cot-memory-{args.no_cot_memory}--{args.template}--{args.model}--{args.fake_type}-reflection"
+    else:
+        table_name = f"{args.dataset}--{args.method}--no-cot-memory-{args.no_cot_memory}--{args.template}--{args.model}"
     db_logger = Logger(
         db_name=args.dataset.value if not args.debug else "debug",
-        table_name=f"{args.dataset}--{args.method}--no-cot-memory-{args.no_cot_memory}--{args.template}--{args.model}--{args.fake_type}-reflection",
+        table_name=table_name,
         record_cls=record_cls,
     )
     async with db_logger:
@@ -88,7 +93,7 @@ async def main(args: Argument):
 
     db_logger = Logger(
         db_name=args.dataset.value if not args.debug else "debug",
-        table_name=f"{args.dataset}--{args.method}--no-cot-memory-{args.no_cot_memory}--{args.template}--{args.model}--{args.fake_type}-reflection--evaluate-by-{args.judge_model}",
+        table_name=f"{table_name}--evaluate-by-{args.judge_model}",
         record_cls=record_cls,
     )
     async with db_logger:
