@@ -50,69 +50,130 @@ async def main():
     method = MethodName.Verbal_0_100
     no_cot_memory = False
 
+    record_cls = dataset.record_cls
+
     records_list = []
 
     # ===== original =====
-    # record_cls = dataset.record_cls
-    # db_logger = Logger(
-    #     db_name=dataset.value,
-    #     table_name=f"{dataset}--{method}--no-cot-memory-{no_cot_memory}--{template}--{model}",
-    #     record_cls=record_cls,
-    # )
-    # async with db_logger:
-    #     records = await db_logger.fetch()
-    # method_records = [record.model_dump() for record in records]
-    # df = pd.DataFrame(method_records)
-    # if method == MethodName.Verbal_0_100:
-    #     df["model_confidence_extracted"] = df["model_confidence_extracted"].apply(lambda x: x / 100)
-    # df["reflection_times"] = df["model_thinking_response"].apply(count_reflections)
-    # records_list.append(df)
-
-    # ===== no reflection =====
-    record_cls = dataset.record_cls
     db_logger = Logger(
         db_name=dataset.value,
-        table_name=f"{dataset}--{method}--no-cot-memory-{no_cot_memory}--{template}--{model}--fake-reflection--evaluate-by-{judge_model}",
+        table_name=f"{dataset}--{method}--no-cot-memory-{no_cot_memory}--{template}--{model}--evaluate-by-{judge_model}",
         record_cls=record_cls,
     )
     async with db_logger:
         records = await db_logger.fetch()
     method_records = [record.model_dump() for record in records]
     df = pd.DataFrame(method_records)
+    df["setting"] = "original"
+    records_list.append(df)
+
+    # ===== less reflection =====
+    # db_logger = Logger(
+    #     db_name=dataset.value,
+    #     table_name=f"{dataset}--{method}--no-cot-memory-{no_cot_memory}--{template}--{model}--less-reflection--evaluate-by-{judge_model}",
+    #     record_cls=record_cls,
+    # )
+    # async with db_logger:
+    #     records = await db_logger.fetch()
+    # method_records = [record.model_dump() for record in records]
+    # df = pd.DataFrame(method_records)
+    # df["setting"] = "less"
+    # records_list.append(df)
+
+    # ===== more reflection =====
+    db_logger = Logger(
+        db_name=dataset.value,
+        table_name=f"{dataset}--{method}--no-cot-memory-{no_cot_memory}--{template}--{model}--more-reflection--evaluate-by-{judge_model}",
+        record_cls=record_cls,
+    )
+    async with db_logger:
+        records = await db_logger.fetch()
+    method_records = [record.model_dump() for record in records]
+    df = pd.DataFrame(method_records)
+    df["setting"] = "more"
+    records_list.append(df)
+
+    df = pd.concat(records_list, ignore_index=True)
+
     if method == MethodName.Verbal_0_100:
         df["model_confidence_extracted"] = df["model_confidence_extracted"].apply(lambda x: x / 100)
 
     df["reflection_times"] = df["model_thinking_response"].apply(count_reflections)
     df["correct_solution_count"] = df["eval_result"].apply(lambda x: int(x.split("/")[0]))
     df["total_solution_count"] = df["eval_result"].apply(lambda x: int(x.split("/")[1]))
-    df["model__template"] = df["model"] + "--" + df["template"]
-    records_list.append(df)
 
-    df = pd.concat(records_list, ignore_index=True)
-    df = df[df["correct_solution_count"] < 100]
-    df = df[df["total_solution_count"] < 100]
+    df = df[df["correct_solution_count"] <= df["total_solution_count"]]
+    df = df[df["correct_solution_count"] <= df["answer_count"]]
+    df = df[df["total_solution_count"] <= df["answer_count"]]
 
-    plt.figure(figsize=(12, 8))
-    sns.lineplot(data=df, x="model_confidence_extracted", y="correct_solution_count", hue="model__template")
-    plt.xlabel("Model Confidence")
-    plt.ylabel("Correct Solution Count")
-    plt.title("Reflection Times vs. Correct Solution Count")
-    plt.show()
+    df["answer_count_bin"] = df["answer_count"].apply(lambda x: int(x / 10))
 
-    spearman_corr = df["reflection_times"].corr(df["correct_solution_count"], method="spearman")
-    plt.figure(figsize=(12, 8))
-    sns.scatterplot(data=df, x="reflection_times", y="correct_solution_count")
-    plt.xlabel("Reflection Times")
-    plt.ylabel("Correct Solution Count")
-    plt.title(f"Reflection Times vs. Correct Solution Count\nSpearman correlation coefficient: {spearman_corr:.4f}")
-    plt.show()
+    df["correct_accuracy"] = df["correct_solution_count"] / df["answer_count"]
+    df["total_accuracy"] = df["total_solution_count"] / df["answer_count"]
+    df["model--template"] = df["model"] + "--" + df["template"]
 
-    spearman_corr = df["reflection_times"].corr(df["total_solution_count"], method="spearman")
-    plt.figure(figsize=(12, 8))
-    sns.scatterplot(data=df, x="reflection_times", y="total_solution_count")
-    plt.xlabel("Reflection Times")
-    plt.ylabel("Total Solution Count")
-    plt.title(f"Reflection Times vs. Total Solution Count\nSpearman correlation coefficient: {spearman_corr:.4f}")
+    # plt.figure()
+    # sns.scatterplot(data=df, x="answer_count_bin", y="correct_accuracy")
+    # plt.xlabel("Answer Count Bin")
+    # plt.ylabel("Correct Acc")
+    # plt.title("Answer Count Bin vs. Correct Acc")
+    # plt.show()
+
+    # for i in range(10):
+    #     plt.figure()
+    #     sns.scatterplot(
+    #         data=df[df["answer_count_bin"] == i],
+    #         x="model_confidence_extracted",
+    #         y="correct_accuracy",
+    #         hue="answer_count_bin",
+    #         palette="viridis",
+    #     )
+    #     plt.xlabel("Model Confidence")
+    #     plt.ylabel("Correct Acc")
+    #     plt.xlim(0 - 0.05, 1 + 0.05)
+    #     plt.ylim(0 - 0.05, 1 + 0.05)
+    #     plt.title("Reflection Times vs. Correct Acc")
+    #     plt.show()
+
+    # plt.figure(figsize=(12, 8))
+    # sns.lineplot(data=df[df["answer_count_bin"] > 7], x="model_confidence_extracted", y="correct_accuracy", hue="model--template")
+    # plt.xlabel("Model Confidence")
+    # plt.ylabel("Correct Acc")
+    # plt.xlim(0 - 0.05, 1 + 0.05)
+    # plt.ylim(0 - 0.05, 1 + 0.05)
+    # plt.title("Reflection Times vs. Correct Acc")
+    # plt.show()
+
+    # plt.figure(figsize=(12, 8))
+    # sns.lineplot(data=df[df["answer_count_bin"] > 7], x="model_confidence_extracted", y="total_accuracy", hue="model--template")
+    # plt.xlabel("Model Confidence")
+    # plt.ylabel("Total Acc")
+    # plt.xlim(0 - 0.05, 1 + 0.05)
+    # plt.ylim(0 - 0.05, 1 + 0.05)
+    # plt.title("Reflection Times vs. Total Acc")
+    # plt.show()
+
+    # spearman_corr = df["reflection_times"].corr(df["correct_accuracy"], method="spearman")
+    # plt.figure(figsize=(12, 8))
+    # sns.lineplot(data=df[df["answer_count_bin"] > 7], x="reflection_times", y="correct_accuracy")
+    # plt.xlabel("Reflection Times")
+    # plt.ylabel("Correct Acc")
+    # plt.title(f"Reflection Times vs. Correct Acc\nSpearman correlation coefficient: {spearman_corr:.4f}")
+    # plt.show()
+    #
+    # spearman_corr = df["reflection_times"].corr(df["total_accuracy"], method="spearman")
+    # plt.figure(figsize=(12, 8))
+    # sns.lineplot(data=df[df["answer_count_bin"] > 7], x="reflection_times", y="total_accuracy")
+    # plt.xlabel("Reflection Times")
+    # plt.ylabel("Total Acc")
+    # plt.title(f"Reflection Times vs. Total Acc\nSpearman correlation coefficient: {spearman_corr:.4f}")
+    # plt.show()
+
+    plt.figure(figsize=(5, 8))
+    sns.boxplot(data=df[df["answer_count_bin"] > 7], x="setting", y="correct_accuracy", hue="setting")
+    plt.xlabel("Setting")
+    plt.ylabel("Acc")
+    plt.title("More reflections vs original")
     plt.show()
 
 
