@@ -53,10 +53,27 @@ async def main():
     records_list = []
 
     # ===== original =====
+    # record_cls = dataset.record_cls
+    # db_logger = Logger(
+    #     db_name=dataset.value,
+    #     table_name=f"{dataset}--{method}--no-cot-memory-{no_cot_memory}--{template}--{model}",
+    #     record_cls=record_cls,
+    # )
+    # async with db_logger:
+    #     records = await db_logger.fetch()
+    # method_records = [record.model_dump() for record in records]
+    # df = pd.DataFrame(method_records)
+    # if method == MethodName.Verbal_0_100:
+    #     df["model_confidence_extracted"] = df["model_confidence_extracted"].apply(lambda x: x / 100)
+    # df["reflection_times"] = df["model_thinking_response"].apply(count_reflections)
+    # df["setting"] = "original"
+    # records_list.append(df)
+
+    # ===== less reflection =====
     record_cls = dataset.record_cls
     db_logger = Logger(
         db_name=dataset.value,
-        table_name=f"{dataset}--{method}--no-cot-memory-{no_cot_memory}--{template}--{model}",
+        table_name=f"{dataset}--{method}--no-cot-memory-{no_cot_memory}--{template}--{model}--less-reflection",
         record_cls=record_cls,
     )
     async with db_logger:
@@ -66,23 +83,25 @@ async def main():
     if method == MethodName.Verbal_0_100:
         df["model_confidence_extracted"] = df["model_confidence_extracted"].apply(lambda x: x / 100)
     df["reflection_times"] = df["model_thinking_response"].apply(count_reflections)
+    df["setting"] = "fake"
     records_list.append(df)
 
-    # ===== no reflection =====
-    record_cls = dataset.record_cls
-    db_logger = Logger(
-        db_name=dataset.value,
-        table_name=f"{dataset}--{method}--no-cot-memory-{no_cot_memory}--{template}--{model}--fake-reflection",
-        record_cls=record_cls,
-    )
-    async with db_logger:
-        records = await db_logger.fetch()
-    method_records = [record.model_dump() for record in records]
-    df = pd.DataFrame(method_records)
-    if method == MethodName.Verbal_0_100:
-        df["model_confidence_extracted"] = df["model_confidence_extracted"].apply(lambda x: x / 100)
-    df["reflection_times"] = df["model_thinking_response"].apply(count_reflections)
-    records_list.append(df)
+    # ===== more reflection =====
+    # record_cls = dataset.record_cls
+    # db_logger = Logger(
+    #     db_name=dataset.value,
+    #     table_name=f"{dataset}--{method}--no-cot-memory-{no_cot_memory}--{template}--{model}--more-reflection",
+    #     record_cls=record_cls,
+    # )
+    # async with db_logger:
+    #     records = await db_logger.fetch()
+    # method_records = [record.model_dump() for record in records]
+    # df = pd.DataFrame(method_records)
+    # if method == MethodName.Verbal_0_100:
+    #     df["model_confidence_extracted"] = df["model_confidence_extracted"].apply(lambda x: x / 100)
+    # df["reflection_times"] = df["model_thinking_response"].apply(count_reflections)
+    # df["setting"] = "more"
+    # records_list.append(df)
 
     df = pd.concat(records_list, ignore_index=True)
 
@@ -104,7 +123,11 @@ async def main():
 
     df["has_reflection"] = df["reflection_times"] > 0
     plt.figure(figsize=(5, 8))
-    sns.boxplot(data=df, x="has_reflection", y="model_confidence_extracted", hue="has_reflection")
+    # sns.boxplot(data=df, x="setting", y="model_confidence_extracted", hue="setting")
+    sns.boxplot(
+        data=df[df["answer_count"] > 80], x="has_reflection", y="model_confidence_extracted", hue="has_reflection"
+    )
+    # sns.histplot(data=df, x="model_confidence_extracted", hue="setting")
     plt.xlabel("Model Confidence")
     plt.ylabel("Density")
     plt.title("Model Confidence Distribution without Reflections")
