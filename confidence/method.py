@@ -286,9 +286,9 @@ class Method:
 
         # Insert a random reflection pattern before </think>
         reflection_patterns = [
-            "Wait,",
-            "Let me double-check.",
-            "Let me think again.",
+            "Wait, there may be other solutions.",
+            "Let me double-check if there is any other solution.",
+            "Let me think again if there is any other solution.",
         ]
         history_thinking_content = history_thinking_content[: -len("</think>")]
         history_thinking_content += "\n" + random.choice(reflection_patterns)

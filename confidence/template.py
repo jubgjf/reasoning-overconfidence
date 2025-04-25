@@ -101,6 +101,8 @@ class LogiQATemplate(ITemplate):
                 + "\n".join([f"{k}. {v}" for k, v in data.choices.items()])
                 + "\nAnswer:"
             )
+        else:
+            assert_never(self)
 
 
 class GAOKAOTemplate(ITemplate):

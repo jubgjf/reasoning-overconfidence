@@ -79,19 +79,8 @@ def find_all_solutions(course_options):
 
 
 with open("./dataset/timetabling.jsonl", "w") as f:
-    question_id, max_questions_per_bin = 0, 10
-    solution_bin = {
-        "0": [],  #  0-10,
-        "1": [],  # 10-20,
-        "2": [],  # 20-30,
-        "3": [],  # 30-40,
-        "4": [],  # 40-50,
-        "5": [],  # 50-60,
-        "6": [],  # 60-70,
-        "7": [],  # 70-80,
-        "8": [],  # 80-90,
-        "9": [],  # 90-100,
-    }
+    question_id, max_questions_per_bin = 0, 800
+    solution_bin = {i: [] for i in range(1, 8 + 1)}  # 1: 50~100, 2: 100~150, ..., 7: 350~400, 8: >400
     while True:
         course_options, _ = generate_problem()
         all_solutions = find_all_solutions(course_options)
@@ -116,33 +105,19 @@ with open("./dataset/timetabling.jsonl", "w") as f:
             question_id=question_id, question=question, answers={"0": answers}, answer_count=len(all_solutions)
         )
 
-        if 0 < len(all_solutions) < 10:
-            solution_bin["0"].append(data)
-        elif 10 < len(all_solutions) < 20:
-            solution_bin["1"].append(data)
-        elif 20 < len(all_solutions) < 30:
-            solution_bin["2"].append(data)
-        elif 30 < len(all_solutions) < 40:
-            solution_bin["3"].append(data)
-        elif 40 < len(all_solutions) < 50:
-            solution_bin["4"].append(data)
-        elif 50 < len(all_solutions) < 60:
-            solution_bin["5"].append(data)
-        elif 60 < len(all_solutions) < 70:
-            solution_bin["6"].append(data)
-        elif 70 < len(all_solutions) < 80:
-            solution_bin["7"].append(data)
-        elif 80 < len(all_solutions) < 90:
-            solution_bin["8"].append(data)
-        elif 90 < len(all_solutions) < 100:
-            solution_bin["9"].append(data)
+        if len(all_solutions) < 50:
+            continue
+        elif len(all_solutions) < 400:
+            solution_bin[len(all_solutions) // 50].append(data)
         else:
-            pass
+            solution_bin[8].append(data)
 
         can_break = True
-        for solutions in solution_bin.values():
+        for k, solutions in solution_bin.items():
             if len(solutions) < max_questions_per_bin:
                 can_break = False
+            elif len(solutions) > max_questions_per_bin * 5:
+                solution_bin[k] = []
         if can_break:
             print("-------------")
             print({k: len(v) for k, v in solution_bin.items()})
@@ -151,7 +126,7 @@ with open("./dataset/timetabling.jsonl", "w") as f:
         print({k: len(v) for k, v in solution_bin.items()})
 
     question_id = 0
-    for solutions in solution_bin.values():
+    for k, solutions in solution_bin.items():
         solutions = solutions[:max_questions_per_bin]
         for solution in solutions:
             solution.question_id = question_id
