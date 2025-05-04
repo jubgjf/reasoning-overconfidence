@@ -153,7 +153,7 @@ Template = GSM8KTemplate | ARCTemplate | LogiQATemplate | GAOKAOTemplate | TimeT
 
 
 def string_to_template(string: str) -> Template:
-    template_cls = [GSM8KTemplate, ARCTemplate, LogiQATemplate, GAOKAOTemplate | TimeTablingTemplate]
+    template_cls = [GSM8KTemplate, ARCTemplate, LogiQATemplate, GAOKAOTemplate, TimeTablingTemplate]
     for cls in template_cls:
         for t in cls:
             if t.value == string:
