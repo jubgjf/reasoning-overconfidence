@@ -20,6 +20,8 @@ class ModelName(Enum):
     QWQ_32B = "qwq-32b"
     DEEPSEEK_R1 = "deepseek-r1-250120"
     DEEPSEEK_R1_DISTILL_QWEN2_5_MATH_7B = "dsr1-distill-qwen2.5-math-7b"
+    QWEN3_8B_THINK = "qwen3-8b-think"
+    QWEN3_8B_NO_THINK = "qwen3-8b-no_think"
 
     def __str__(self) -> str:
         return self.value
@@ -42,6 +44,8 @@ class ModelName(Enum):
             return "deepseek-ai/DeepSeek-R1"
         elif self == ModelName.DEEPSEEK_R1_DISTILL_QWEN2_5_MATH_7B:
             return "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"
+        elif self in [ModelName.QWEN3_8B_THINK, ModelName.QWEN3_8B_NO_THINK]:
+            return "Qwen/Qwen3-8B"
         else:
             assert_never(self)
 
@@ -58,9 +62,9 @@ class CompleteAPIResponse(BaseModel):
 
 class Model:
     def __init__(self, model_name: ModelName):
-        self._model_name = model_name
+        self.model_name = model_name
         self._client = self._get_client()
-        self._tokenizer = AutoTokenizer.from_pretrained(self._model_name.hf_name)
+        self._tokenizer = AutoTokenizer.from_pretrained(self.model_name.hf_name)
 
     @staticmethod
     def _get_client() -> AsyncOpenAI:
@@ -87,16 +91,25 @@ class Model:
         async def request_once() -> Result[ChatAPIResponse, str]:
             try:
                 response = await self._client.chat.completions.create(
-                    model=self._model_name.model_id,
+                    model=self.model_name.model_id,
                     messages=messages,
                     temperature=temperature,
                     max_tokens=max_tokens,
                     logprobs=logprobs,
                     top_logprobs=5 if logprobs else None,
                 )
+                if self.model_name in [ModelName.QWEN3_8B_THINK]:
+                    assert response.choices[0].message.model_extra["reasoning_content"] is not None
+                    message_content = (
+                        response.choices[0].message.model_extra["reasoning_content"]
+                        + "</think>"
+                        + response.choices[0].message.content
+                    )
+                else:
+                    message_content = response.choices[0].message.content
                 return Ok(
                     ChatAPIResponse(
-                        message_content=response.choices[0].message.content,
+                        message_content=message_content,
                         logprobs_content=response.choices[0].logprobs.content if logprobs else None,
                     )
                 )
@@ -123,10 +136,13 @@ class Model:
         max_tokens: int = 16384,
         logprobs: bool = False,
     ) -> Result[CompleteAPIResponse, str]:
+        if self.model_name in [ModelName.QWEN3_8B_THINK, ModelName.QWEN3_8B_NO_THINK]:
+            raise NotImplementedError
+
         async def request_once() -> Result[CompleteAPIResponse, str]:
             try:
                 response = await self._client.completions.create(
-                    model=self._model_name.model_id,
+                    model=self.model_name.model_id,
                     prompt=prompt,
                     temperature=temperature,
                     max_tokens=max_tokens,

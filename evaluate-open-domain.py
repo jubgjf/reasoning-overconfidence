@@ -58,7 +58,13 @@ async def evaluate(judge_model: Model, record: dict) -> Result[tuple[int, int, d
         "and y is the number of solutions output by the model. "
         "Besides, x or y can be 0 if no solution is output by the model."
     )
-    judge_response_result = await judge_model.request(messages=[{"role": "user", "content": judge_prompt}])
+    if judge_model.model_name in [ModelName.QWEN3_8B_THINK]:
+        messages = [{"role": "user", "content": judge_prompt + " /think"}]
+    elif judge_model.model_name in [ModelName.QWEN3_8B_NO_THINK]:
+        messages = [{"role": "user", "content": judge_prompt + " /no_think"}]
+    else:
+        messages = [{"role": "user", "content": judge_prompt}]
+    judge_response_result = await judge_model.request(messages=messages)
     if judge_response_result.is_err():
         return judge_response_result
 
