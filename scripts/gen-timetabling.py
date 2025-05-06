@@ -136,7 +136,8 @@ with open("./dataset/timetabling.jsonl", "w") as f:
 with open("./dataset/timetabling.jsonl") as f:
     dataset = [json.loads(line) for line in f.readlines()]
 answer_counts = [data["answer_count"] for data in dataset]
-sns.histplot(answer_counts, bins=10)
+answer_counts_bins = [int(x // 50) if int(x // 50) < 8 else 8 for x in answer_counts]
+sns.histplot(answer_counts_bins, bins=8)
 plt.xlabel("Number of Solutions")
 plt.ylabel("Frequency")
 plt.title("Distribution of Number of Solutions")
