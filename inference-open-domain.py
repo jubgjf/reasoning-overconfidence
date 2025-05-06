@@ -25,6 +25,7 @@ class Argument(Tap):
     no_cot_memory: bool = False
     force_update: bool = False
     concurrency: int = 100
+    turn: int | None = None
     debug: bool = False
 
     def configure(self) -> None:
@@ -47,12 +48,13 @@ async def request(
 async def main(args: Argument):
     record_cls = args.dataset.record_cls
     title = f"{args.dataset}--{args.method}--no-cot-memory-{args.no_cot_memory}--{args.template}--{args.model}"
-    db_logger = Logger(
-        db_name=args.dataset.value if not args.debug else "debug",
-        table_name=title,
-        record_cls=record_cls,
-        force_update=args.force_update,
-    )
+    if args.debug:
+        db_name = "debug"
+    elif args.turn is None:
+        db_name = args.dataset.value
+    else:
+        db_name = f"{args.dataset.value}--turn{args.turn}"
+    db_logger = Logger(db_name=db_name, table_name=title, record_cls=record_cls, force_update=args.force_update)
     async with db_logger:
         # ===== model =====
         model = Model(args.model)

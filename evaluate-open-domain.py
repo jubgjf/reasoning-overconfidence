@@ -35,6 +35,7 @@ class Argument(Tap):
     fake_type: FakeType = FakeType.less
     no_cot_memory: bool = False
     concurrency: int = 200
+    turn: int | None = None
     debug: bool = False
 
     def configure(self) -> None:
@@ -79,11 +80,13 @@ async def main(args: Argument):
         table_name = f"{args.dataset}--{args.method}--no-cot-memory-{args.no_cot_memory}--{args.template}--{args.model}--{args.fake_type}-reflection"
     else:
         table_name = f"{args.dataset}--{args.method}--no-cot-memory-{args.no_cot_memory}--{args.template}--{args.model}"
-    db_logger = Logger(
-        db_name=args.dataset.value if not args.debug else "debug",
-        table_name=table_name,
-        record_cls=record_cls,
-    )
+    if args.debug:
+        db_name = "debug"
+    elif args.turn is None:
+        db_name = args.dataset.value
+    else:
+        db_name = f"{args.dataset.value}--turn{args.turn}"
+    db_logger = Logger(db_name=db_name, table_name=table_name, record_cls=record_cls)
     async with db_logger:
         records = await db_logger.fetch()
         records = [record.model_dump() for record in records]
