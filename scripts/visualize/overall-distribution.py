@@ -1,30 +1,39 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
+from pydantic import BaseModel
 from tortoise import run_async
 
-from confidence.template import TimeTablingTemplate
+from confidence.template import TimeTablingTemplate, Template
 from confidence.dataset import DatasetName
 from confidence.logger import Logger
 from confidence.method import MethodName
 from confidence.model import ModelName
 
 
+class Setting(BaseModel):
+    model: ModelName
+    template: Template
+
+
 async def main():
-    model = ModelName.QWQ_32B
+    judge_model = ModelName.QWQ_32B
     dataset = DatasetName.TimeTabling
-    template = TimeTablingTemplate.simple
+    method = MethodName.Verbal_0_100
     no_cot_memory = False
 
-    methods = [MethodName.Verbal_0_100]
-    # methods = [MethodName.Verbal_0_100, MethodName.LogProb, MethodName.P_True]
+    settings = [
+        Setting(model=ModelName.QWQ_32B, template=TimeTablingTemplate.simple),
+        Setting(model=ModelName.QWEN2_5_7B, template=TimeTablingTemplate.simple),
+        Setting(model=ModelName.QWEN2_5_7B, template=TimeTablingTemplate.cot),
+    ]
 
     records_list = []
-    for method in methods:
+    for setting in settings:
         record_cls = dataset.record_cls
         db_logger = Logger(
             db_name=dataset.value,
-            table_name=f"{dataset}--{method}--no-cot-memory-{no_cot_memory}--{template}--{model}",
+            table_name=f"{dataset}--{method}--no-cot-memory-{no_cot_memory}--{setting.template}--{setting.model}--evaluate-by-{judge_model}",
             record_cls=record_cls,
         )
         async with db_logger:
@@ -34,6 +43,7 @@ async def main():
         df = pd.DataFrame(method_records)
         if method == MethodName.Verbal_0_100:
             df["model_confidence_extracted"] = df["model_confidence_extracted"].apply(lambda x: x / 100)
+        df["setting"] = f"{setting.model}--{setting.template}"
 
         records_list.append(df)
 
@@ -42,11 +52,11 @@ async def main():
     bins = [i / 10 for i in range(11)]
 
     plt.figure(figsize=(10, 6))
-    sns.histplot(df, x="model_confidence_extracted", hue="method", bins=bins, multiple="dodge", alpha=0.25)
+    sns.histplot(df, x="model_confidence_extracted", hue="setting", bins=bins, multiple="dodge", alpha=0.25)
     plt.xlim(0 - 0.05, 1 + 0.05)
     plt.xlabel("Confidence")
     plt.ylabel("Frequency")
-    plt.title(f"Confidence Distribution Comparison\n{dataset}--{template}--{model}")
+    plt.title(f"Confidence Distribution Comparison\n{dataset}")
     plt.tight_layout()
     plt.show()
 
