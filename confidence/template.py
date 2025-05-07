@@ -142,7 +142,11 @@ class TimeTablingTemplate(ITemplate):
 
     def prompt(self, data: TimeTablingData) -> str:
         if self == self.simple:
-            return f"{data.question}\nPlease provide all feasible schedules that satisfies all constraints one by one."
+            return f"{data.question}\nPlease provide all feasible schedules that satisfies all constraints one by one and output the number of feasible schedules."
+        elif self == self.cot:
+            return f"{data.question}\nPlease provide all feasible schedules that satisfies all constraints one by one and output the number of feasible schedules. Think step by step before answering."
+        else:
+            assert_never(self)
 
 
 class SubsetSumTemplate(ITemplate):
