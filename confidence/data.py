@@ -38,4 +38,10 @@ class TimeTablingData(BaseModel):
     answer_count: int
 
 
-Data = TypeVar("Data", GSM8KData, ARCData, LogiQAData, GAOKAOData, TimeTablingData)
+class SubsetSumData(BaseModel):
+    question_id: int
+    question: str
+    answer_count: int
+
+
+Data = TypeVar("Data", GSM8KData, ARCData, LogiQAData, GAOKAOData, TimeTablingData, SubsetSumData)
