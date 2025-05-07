@@ -1,144 +1,350 @@
-import json
-import matplotlib.pyplot as plt
-import seaborn as sns
 import random
-from itertools import product
-
+import json
+import copy
+from collections import defaultdict
 from confidence.data import TimeTablingData
 
 
-def generate_problem():
-    """生成一个保证存在可行解的排课问题"""
-    n_courses = 10
-    n_teachers = 5
-    n_times = 10
-    n_rooms = 10
+class TimetablingProblemGenerator:
+    def __init__(self, max_courses, max_times, max_rooms, max_teachers):
+        """
+        Initializes the problem generator with maximum limits for resources.
 
-    # 生成基础可行解
-    solution = {}
-    used_tr = set()  # 已占用的 (时间, 教室)
-    used_tt = set()  # 已占用的 (教师, 时间)
-    course_options = {}
+        Args:
+            max_courses (int): Maximum number of courses to generate.
+            max_times (int): Maximum number of time slots.
+            max_rooms (int): Maximum number of rooms.
+            max_teachers (int): Maximum number of teachers.
+        """
+        self.max_courses = max_courses
+        self.max_times = max_times
+        self.max_rooms = max_rooms
+        self.max_teachers = max_teachers
 
-    for course in range(n_courses):
-        while True:
-            time = random.randint(0, n_times - 1)
-            room = random.randint(0, n_rooms - 1)
-            teacher = random.randint(0, n_teachers - 1)
-            if (time, room) not in used_tr and (teacher, time) not in used_tt:
-                # 记录可行解
-                solution[f"Course{course}"] = {"time": time, "room": room, "teacher": teacher}
-                used_tr.add((time, room))
-                used_tt.add((teacher, time))
-                # 生成课程选项（至少包含可行解的值，并随机扩展）
-                possible_times = [time]
-                if random.random() < 0.5 and time + 1 < n_times:
-                    possible_times.append(time + 1)
-                possible_rooms = [room]
-                possible_teachers = [teacher]
-                course_options[f"Course{course}"] = {
-                    "times": possible_times,
-                    "rooms": possible_rooms,
-                    "teachers": possible_teachers,
-                }
-                break
-    return course_options, solution
+    def generate_problem(
+        self,
+        num_courses,
+        num_times,
+        num_rooms,
+        num_teachers,
+        course_time_options=(2, 4),
+        course_room_options=(1, 3),
+        specific_room_prob=0.2,
+    ):
+        """
+        Generates a random timetabling problem instance.
+
+        Args:
+            num_courses (int): Number of courses in this instance.
+            num_times (int): Number of time slots in this instance.
+            num_rooms (int): Number of rooms in this instance.
+            num_teachers (int): Number of teachers in this instance.
+            course_time_options (tuple): (min, max) number of allowed time slots per course.
+            course_room_options (tuple): (min, max) number of allowed rooms per course.
+            specific_room_prob (float): Probability that a course requires a specific single room.
+
+        Returns:
+            dict: A dictionary representing the problem, or None if parameters are invalid.
+        """
+        if not (
+            1 <= num_courses <= self.max_courses
+            and 1 <= num_times <= self.max_times
+            and 1 <= num_rooms <= self.max_rooms
+            and 1 <= num_teachers <= self.max_teachers
+        ):
+            print("Warning: Requested parameters exceed maximum limits.")
+            return None
+
+        problem = {
+            "num_courses": num_courses,
+            "num_times": num_times,
+            "num_rooms": num_rooms,
+            "num_teachers": num_teachers,
+            "courses": {},
+        }
+
+        all_times = list(range(num_times))
+        all_rooms = list(range(num_rooms))
+        all_teachers = list(range(num_teachers))
+
+        for i in range(num_courses):
+            course_id = f"Course{i}"
+            teacher_id = random.choice(all_teachers)  # Assign one teacher per course
+
+            # Randomly select allowed times
+            num_allowed_times = random.randint(*course_time_options)
+            allowed_times = sorted(random.sample(all_times, min(num_allowed_times, num_times)))
+
+            # Randomly select allowed rooms or assign a specific room
+            if random.random() < specific_room_prob and num_rooms > 0:
+                allowed_rooms = [random.choice(all_rooms)]
+            else:
+                num_allowed_rooms = random.randint(*course_room_options)
+                allowed_rooms = sorted(random.sample(all_rooms, min(num_allowed_rooms, num_rooms)))
+
+            problem["courses"][course_id] = {
+                "teacher": teacher_id,
+                "allowed_times": allowed_times,
+                "allowed_rooms": allowed_rooms,
+            }
+
+        return problem
+
+    def format_problem_text(self, problem):
+        """Formats the problem dictionary into a human-readable text description."""
+        if problem is None:
+            return "Invalid Problem"
+
+        text = "Constraints:\n"
+        for course_id, details in problem["courses"].items():
+            text += f"- {course_id} : Time {details['allowed_times']}, "
+            text += f"Room {details['allowed_rooms']}, Teacher [{details['teacher']}]\n"
+
+        text += "- Multiple courses cannot be scheduled in the same time slot and room.\n"
+        text += "- A teacher can only teach one course at a time.\n"
+
+        return text
 
 
-def find_all_solutions(course_options):
-    """遍历所有可能组合，返回满足约束的解"""
-    course_list = []
-    for course in course_options:
-        co = course_options[course]
-        assignments = []
-        for t in co["times"]:
-            for r in co["rooms"]:
-                for p in co["teachers"]:
-                    assignments.append({"course": course, "time": t, "room": r, "teacher": p})
-        course_list.append(assignments)
+class TimetablingSolver:
+    def __init__(self):
+        self.solutions = []
+        self.problem = None
+        self.course_ids = []
 
-    all_combinations = product(*course_list)
-    solutions = []
+    def solve(self, problem):
+        """
+        Finds all feasible solutions for a given timetabling problem using backtracking.
 
-    for combo in all_combinations:
-        time_room = set()
-        teacher_time = set()
-        valid = True
-        for assign in combo:
-            t = assign["time"]
-            r = assign["room"]
-            p = assign["teacher"]
-            if (t, r) in time_room or (p, t) in teacher_time:
-                valid = False
-                break
-            time_room.add((t, r))
-            teacher_time.add((p, t))
-        if valid:
-            solutions.append(combo)
-    return solutions
+        Args:
+            problem (dict): The problem dictionary generated by TimetablingProblemGenerator.
+
+        Returns:
+            list: A list of solution dictionaries. Returns an empty list if no solutions found.
+        """
+        self.problem = problem
+        if self.problem is None:
+            return []
+
+        self.solutions = []
+        self.course_ids = list(problem["courses"].keys())
+        num_courses = problem["num_courses"]
+
+        # State for backtracking: current assignment and used resources
+        current_assignment = {}  # course_id -> (time_idx, room_idx)
+        used_time_room = set()  # set of (time_idx, room_idx)
+        used_time_teacher = set()  # set of (time_idx, teacher_id)
+
+        self._backtrack(0, current_assignment, used_time_room, used_time_teacher)
+
+        return self.solutions
+
+    def _backtrack(self, course_idx, current_assignment, used_time_room, used_time_teacher):
+        """Recursive backtracking function."""
+        num_courses = self.problem["num_courses"]
+
+        # Base case: All courses assigned
+        if course_idx == num_courses:
+            # A valid solution is found
+            self.solutions.append(copy.deepcopy(current_assignment))
+            return
+
+        current_course_id = self.course_ids[course_idx]
+        course_details = self.problem["courses"][current_course_id]
+        teacher_id = course_details["teacher"]
+        allowed_times = course_details["allowed_times"]
+        allowed_rooms = course_details["allowed_rooms"]
+
+        # Try all combinations of allowed time and room for the current course
+        for time_idx in allowed_times:
+            for room_idx in allowed_rooms:
+                # Check for conflicts with already assigned courses
+                is_conflict = False
+
+                # Constraint 1: Multiple courses cannot be scheduled in the same time slot and room.
+                if (time_idx, room_idx) in used_time_room:
+                    is_conflict = True
+
+                # Constraint 2: A teacher can only teach one course at a time.
+                if not is_conflict and (time_idx, teacher_id) in used_time_teacher:
+                    is_conflict = True
+
+                if not is_conflict:
+                    # Make assignment
+                    current_assignment[current_course_id] = (time_idx, room_idx)
+                    used_time_room.add((time_idx, room_idx))
+                    used_time_teacher.add((time_idx, teacher_id))
+
+                    # Recurse for the next course
+                    self._backtrack(course_idx + 1, current_assignment, used_time_room, used_time_teacher)
+
+                    # Backtrack: Unmake assignment for exploring other options
+                    del current_assignment[current_course_id]
+                    used_time_room.remove((time_idx, room_idx))
+                    used_time_teacher.remove((time_idx, teacher_id))
+
+    def format_solutions_text(self, solutions, problem):
+        """Formats a list of solution dictionaries into human-readable text."""
+        if not solutions:
+            return "No feasible solutions found."
+
+        text = ""
+        for i, solution in enumerate(solutions):
+            text += f"Solution {i + 1}:\n"
+            text += "| Course  | Time  | Room  | Teacher  |\n"
+            text += "|---------|-------|-------|----------|\n"
+            # Sort courses by Course ID for consistent output
+            for course_id in sorted(solution.keys()):
+                time_idx, room_idx = solution[course_id]
+                teacher_id = problem["courses"][course_id]["teacher"]
+                text += f"| {course_id:<7} | T{time_idx:<4} | R{room_idx:<4} | P{teacher_id:<8}|\n"  # Use P for person/teacher
+            text += "\n"  # Add a newline between solutions
+
+        return text.strip()  # Remove trailing newline
 
 
-with open("./dataset/timetabling.jsonl", "w") as f:
-    question_id, max_questions_per_bin = 0, 800
-    solution_bin = {i: [] for i in range(1, 8 + 1)}  # 1: 50~100, 2: 100~150, ..., 7: 350~400, 8: >400
-    while True:
-        course_options, _ = generate_problem()
-        all_solutions = find_all_solutions(course_options)
+# --- Example Usage and Data Generation Loop ---
 
-        question = "Constraints:\n"
-        for course in course_options:
-            opts = course_options[course]
-            question += f"- {course} : Time {opts['times']}, Room {opts['rooms']}, Teacher {opts['teachers']}\n"
-        question += "- Multiple courses cannot be scheduled in the same time slot and room.\n"
-        question += "- A teacher can only teach one course at a time.\n"
+if __name__ == "__main__":
+    # Define parameters for problem generation
+    MAX_C = 7  # Max reasonable courses for enumeration
+    MAX_T = 10
+    MAX_R = 10
+    MAX_TEA = 5
 
-        answers = f"Total {len(all_solutions)} solutions\n\n"
-        for idx, sol in enumerate(all_solutions, 1):
-            answers += f"Solution {idx}:\n"
-            answers += "| Course  | Time  | Room  | Teacher  |\n"
-            answers += "|---------|-------|-------|----------|\n"
-            for assign in sol:
-                answers += f"| {assign['course']} | T{assign['time']}    | R{assign['room']}    | P{assign['teacher']}       |\n"
-            answers += "\n"
+    generator = TimetablingProblemGenerator(MAX_C, MAX_T, MAX_R, MAX_TEA)
+    solver = TimetablingSolver()
 
-        data = TimeTablingData(
-            question_id=question_id, question=question, answers={"0": answers}, answer_count=len(all_solutions)
+    # Target number of problems per difficulty level
+    TARGET_PROBLEMS_PER_LEVEL = 100
+    # Define difficulty levels by number of solutions
+    # You might adjust these ranges based on your observed distribution
+    DIFFICULTY_LEVELS = [
+        (1, 50),
+        (51, 100),
+        (101, 150),
+        (151, 200),
+        (201, 250),
+        (251, 300),
+        (301, 350),
+        (351, 400),
+        (401, 450),
+        (451, 500),
+    ]
+    NUM_DIFFICULTY_LEVELS = len(DIFFICULTY_LEVELS)
+    TOTAL_TARGET_PROBLEMS = TARGET_PROBLEMS_PER_LEVEL * NUM_DIFFICULTY_LEVELS
+
+    # To control complexity of generated problems (adjust these to get desired solution distribution)
+    # Small number of courses and more resources generally leads to more solutions
+    # Larger number of courses and fewer resources increase constraints and reduce solutions
+    # You might need to experiment with these ranges.
+    MIN_C = 3
+    MIN_T = 3
+    MIN_R = 2
+    MIN_TEA = 2
+    COURSE_TIME_OPTS = (2, 4)
+    COURSE_ROOM_OPTS = (1, 3)
+    SPECIFIC_ROOM_PROB = 0.1  # Probability of assigning a specific room constraint
+
+    problems_by_difficulty = defaultdict(list)
+    generated_count = 0
+
+    print(
+        f"Generating and solving problems until {TOTAL_TARGET_PROBLEMS} feasible problems are found across {NUM_DIFFICULTY_LEVELS} difficulty levels..."
+    )
+
+    # Loop until enough problems are collected for each difficulty level
+    while generated_count < TOTAL_TARGET_PROBLEMS:
+        # Randomly select parameters for the current problem instance
+        num_c = random.randint(MIN_C, MAX_C)
+        num_t = random.randint(MIN_T, MAX_T)
+        num_r = random.randint(MIN_R, MAX_R)
+        num_tea = random.randint(MIN_TEA, MAX_TEA)
+
+        # Ensure parameters are valid (not strictly needed if using ranges within max limits, but good practice)
+        if num_c > 0 and num_t > 0 and num_r > 0 and num_tea > 0:
+            problem = generator.generate_problem(
+                num_c,
+                num_t,
+                num_r,
+                num_tea,
+                course_time_options=COURSE_TIME_OPTS,
+                course_room_options=COURSE_ROOM_OPTS,
+                specific_room_prob=SPECIFIC_ROOM_PROB,
+            )
+
+            if problem:
+                solutions = solver.solve(problem)
+                num_solutions = len(solutions)
+
+                if num_solutions > 0:  # Only keep problems with at least one solution
+                    # Determine difficulty level based on number of solutions
+                    difficulty_level = -1
+                    for level_idx, (min_sol, max_sol) in enumerate(DIFFICULTY_LEVELS):
+                        if min_sol <= num_solutions <= max_sol:
+                            difficulty_level = level_idx
+                            break
+
+                    if difficulty_level != -1:
+                        if len(problems_by_difficulty[difficulty_level]) < TARGET_PROBLEMS_PER_LEVEL:
+                            # Store problem text and solutions text
+                            problem_text = generator.format_problem_text(problem)
+                            solutions_text = solver.format_solutions_text(solutions, problem)
+
+                            problems_by_difficulty[difficulty_level].append(
+                                {
+                                    "problem_params": (num_c, num_t, num_r, num_tea),
+                                    "problem_text": problem_text,
+                                    "num_solutions": num_solutions,
+                                    # Optionally store solutions text/data if needed later, but num_solutions is key for filtering
+                                    "solutions_text": solutions_text,
+                                    # "solutions_data": solutions # Warning: can be large!
+                                }
+                            )
+                            generated_count += 1
+                            print(
+                                f"Generated problem with {num_solutions} solutions (Level {difficulty_level + 1}). Total generated: {generated_count}/{TOTAL_TARGET_PROBLEMS}"
+                            )
+                        # else:
+                        # print(f"Skipping problem with {num_solutions} solutions (Level {difficulty_level+1}) as target for this level reached.")
+
+    print("\n--- Generation Complete ---")
+    print("Summary of problems generated per difficulty level:")
+    for level_idx, count in sorted([(k, len(v)) for k, v in problems_by_difficulty.items()]):
+        sol_range = DIFFICULTY_LEVELS[level_idx]
+        print(
+            f"Level {level_idx + 1} ({sol_range[0]} - {sol_range[1]}{'+' if sol_range[1] == float('inf') else ''} solutions): {count} problems"
         )
 
-        if len(all_solutions) < 50:
-            continue
-        elif len(all_solutions) < 400:
-            solution_bin[len(all_solutions) // 50].append(data)
-        else:
-            solution_bin[8].append(data)
+    # Example of accessing generated data for a specific level (e.g., Level 1)
+    if 0 in problems_by_difficulty:
+        print("\n--- Example Problem (Level 1) ---")
+        example_problem_data = problems_by_difficulty[0][0]  # Get the first problem of level 1
+        print("Problem Text:")
+        print(example_problem_data["problem_text"])
+        print("\nNumber of Solutions (Enumerated):", example_problem_data["num_solutions"])
+        # print("\nExample Solutions Text:")
+        # # Need to re-solve or store solutions text if you want to print it here
+        # re_solved_solutions = solver.solve(generator.generate_problem(*example_problem_data["problem_params"], course_time_options=COURSE_TIME_OPTS, course_room_options=COURSE_ROOM_OPTS, specific_room_prob=SPECIFIC_ROOM_PROB)) # Re-generate and solve based on params
+        # print(solver.format_solutions_text(re_solved_solutions, generator.generate_problem(*example_problem_data["problem_params"], course_time_options=COURSE_TIME_OPTS, course_room_options=COURSE_ROOM_OPTS, specific_room_prob=SPECIFIC_ROOM_PROB)))
+    else:
+        print("\nNo problems generated for Level 1.")
 
-        can_break = True
-        for k, solutions in solution_bin.items():
-            if len(solutions) < max_questions_per_bin:
-                can_break = False
-            elif len(solutions) > max_questions_per_bin * 5:
-                solution_bin[k] = []
-        if can_break:
-            print("-------------")
-            print({k: len(v) for k, v in solution_bin.items()})
-            break
+    # You would typically save problems_by_difficulty to a file (e.g., JSON, pickle)
+    # for later use in your LLM experiments.
+    with open("./dataset/timetabling.jsonl", "w") as f:
+        # Need to make problem_by_difficulty JSON serializable if saving problem objects
+        # For simplicity, just saving count and text might be sufficient for LLM input
+        question_id = 0
+        for level, problems_list in problems_by_difficulty.items():
+            for problem_data in problems_list:
+                data = TimeTablingData(
+                    question_id=question_id,
+                    question=problem_data["problem_text"],
+                    answers={"0": problem_data["solutions_text"]},
+                    answer_count=problem_data["num_solutions"],
+                )
+                question_id += 1
+                f.write(json.dumps(data.model_dump(), ensure_ascii=False) + "\n")
 
-        print({k: len(v) for k, v in solution_bin.items()})
-
-    question_id = 0
-    for k, solutions in solution_bin.items():
-        solutions = solutions[:max_questions_per_bin]
-        for solution in solutions:
-            solution.question_id = question_id
-            f.write(json.dumps(solution.model_dump(), ensure_ascii=False) + "\n")
-            question_id += 1
-
-with open("./dataset/timetabling.jsonl") as f:
-    dataset = [json.loads(line) for line in f.readlines()]
-answer_counts = [data["answer_count"] for data in dataset]
-answer_counts_bins = [int(x // 50) if int(x // 50) < 8 else 8 for x in answer_counts]
-sns.histplot(answer_counts_bins, bins=8)
-plt.xlabel("Number of Solutions")
-plt.ylabel("Frequency")
-plt.title("Distribution of Number of Solutions")
-plt.show()
+    print("\nDataset structure saved (example).")
