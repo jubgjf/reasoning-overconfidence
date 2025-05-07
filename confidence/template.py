@@ -142,9 +142,54 @@ class TimeTablingTemplate(ITemplate):
 
     def prompt(self, data: TimeTablingData) -> str:
         if self == self.simple:
-            return f"{data.question}\nPlease provide all feasible schedules that satisfies all constraints one by one and output the number of feasible schedules."
+            return (
+                "You are asked to perform a timetabling task.\n"
+                "Please provide all feasible schedules that satisfies all constraints one by one and output the number of feasible schedules.\n"
+                "Output format example:\n"
+                "Solution 1:\n"
+                "| Course  | Time  | Room  | Teacher  |\n"
+                "|---------|-------|-------|----------|\n"
+                "| Course0 | T2    | R0    | P0       |\n"
+                "| Course1 | T3    | R2    | P2       |\n"
+                "| Course2 | T0    | R2    | P1       |\n"
+                "Solution 2:\n"
+                "| Course  | Time  | Room  | Teacher  |\n"
+                "|---------|-------|-------|----------|\n"
+                "| Course0 | T2    | R0    | P0       |\n"
+                "| Course1 | T3    | R2    | P2       |\n"
+                "| Course2 | T1    | R2    | P1       |\n"
+                "...\n"
+                "\n"
+                "Total xxx feasible solutions shown above.\n"
+                "The question is\n"
+                f"{data.question}\n"
+                "You must output all feasible solutions without using ellipsis, etc."
+            )
         elif self == self.cot:
-            return f"{data.question}\nPlease provide all feasible schedules that satisfies all constraints one by one and output the number of feasible schedules. Think step by step before answering."
+            return (
+                "You are asked to perform a timetabling task.\n"
+                "Please provide all feasible schedules that satisfies all constraints one by one and output the number of feasible schedules.\n"
+                "Output format example:\n"
+                "Solution 1:\n"
+                "| Course  | Time  | Room  | Teacher  |\n"
+                "|---------|-------|-------|----------|\n"
+                "| Course0 | T2    | R0    | P0       |\n"
+                "| Course1 | T3    | R2    | P2       |\n"
+                "| Course2 | T0    | R2    | P1       |\n"
+                "Solution 2:\n"
+                "| Course  | Time  | Room  | Teacher  |\n"
+                "|---------|-------|-------|----------|\n"
+                "| Course0 | T2    | R0    | P0       |\n"
+                "| Course1 | T3    | R2    | P2       |\n"
+                "| Course2 | T1    | R2    | P1       |\n"
+                "...\n"
+                "Total xxx feasible solutions shown above.\n"
+                "\n"
+                "The question is\n"
+                f"{data.question}\n"
+                "You must output all feasible solutions without using ellipsis, etc."
+                "Think step by step before answering."
+            )
         else:
             assert_never(self)
 
@@ -155,9 +200,34 @@ class SubsetSumTemplate(ITemplate):
 
     def prompt(self, data: SubsetSumData) -> str:
         if self == self.simple:
-            return f"{data.question}\nPlease provide all feasible subsets that meet the requirements one by one and output the number of feasible subsets."
+            return (
+                "You are asked to perform a subset-sum task.\n"
+                "Please provide all feasible subsets that meet the requirements one by one and output the number of feasible subsets.\n"
+                "Output format example:\n"
+                "Solution 1: {1, 3, 5}\n"
+                "Solution 2: {1, 4, 4}\n"
+                "...\n"
+                "Total xxx feasible solutions shown above.\n"
+                "\n"
+                "The question is\n"
+                f"{data.question}\n"
+                "You must output all feasible solutions without using ellipsis, etc."
+            )
         elif self == self.cot:
-            return f"{data.question}\nPlease provide all feasible subsets that meet the requirements one by one and output the number of feasible subsets. Think step by step before answering."
+            return (
+                "You are asked to perform a subset-sum task.\n"
+                "Please provide all feasible subsets that meet the requirements one by one and output the number of feasible subsets.\n"
+                "Output format example:\n"
+                "Solution 1: {1, 3, 5}\n"
+                "Solution 2: {1, 4, 4}\n"
+                "...\n"
+                "Total xxx feasible solutions shown above.\n"
+                "\n"
+                "The question is\n"
+                f"{data.question}\n"
+                "You must output all feasible solutions without using ellipsis, etc."
+                "Think step by step before answering."
+            )
         else:
             assert_never(self)
 
