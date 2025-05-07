@@ -129,7 +129,7 @@ def extract_answer_and_confidence(
     question_turn: ChatResponsePerTurn | CompleteResponsePerTurn,
     confidence_turn: ChatResponsePerTurn | None,
 ) -> Result[tuple[str, float], str]:
-    if dataset_name == DatasetName.TimeTabling:
+    if dataset_name in [DatasetName.TimeTabling, DatasetName.SubsetSum]:
         assert method_name == MethodName.Verbal_0_100
 
     postprocess_map = {
@@ -138,6 +138,7 @@ def extract_answer_and_confidence(
         DatasetName.LogiQA: first_option_postprocess,
         DatasetName.GAOKAO_Physics: gaokao_postprocess,
         DatasetName.TimeTabling: lambda x: Ok((split_thinking_answer(x)[-1], -1, -1)),
+        DatasetName.SubsetSum: lambda x: Ok((split_thinking_answer(x)[-1], -1, -1)),
     }
     postprocessor = postprocess_map[dataset_name]
 

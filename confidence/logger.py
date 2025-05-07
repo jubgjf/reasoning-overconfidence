@@ -8,7 +8,7 @@ from tortoise import Tortoise, fields
 from tortoise.contrib.pydantic import pydantic_queryset_creator
 from tortoise.models import Model as TortoiseModel
 
-from .data import ARCData, GAOKAOData, GSM8KData, LogiQAData, TimeTablingData
+from .data import ARCData, GAOKAOData, GSM8KData, LogiQAData, TimeTablingData, SubsetSumData
 
 TableClass: Type[TortoiseModel]
 
@@ -130,4 +130,7 @@ class GAOKAORecord(IRecord, GAOKAOData): ...
 class TimeTablingRecord(IRecord, TimeTablingData): ...
 
 
-Record = TypeVar("Record", GSM8KRecord, ARCRecord, LogiQARecord, GAOKAORecord, TimeTablingRecord)
+class SubsetSumRecord(IRecord, SubsetSumData): ...
+
+
+Record = TypeVar("Record", GSM8KRecord, ARCRecord, LogiQARecord, GAOKAORecord, TimeTablingRecord, SubsetSumRecord)

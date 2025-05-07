@@ -7,8 +7,8 @@ from typing import Type
 from pydantic import BaseModel
 from typing_extensions import TypeVar
 
-from .data import Data, GSM8KData, ARCData, LogiQAData, GAOKAOData, TimeTablingData
-from .logger import GSM8KRecord, ARCRecord, LogiQARecord, GAOKAORecord, Record, TimeTablingRecord
+from .data import Data, GSM8KData, ARCData, LogiQAData, GAOKAOData, TimeTablingData, SubsetSumData
+from .logger import GSM8KRecord, ARCRecord, LogiQARecord, GAOKAORecord, Record, TimeTablingRecord, SubsetSumRecord
 
 
 class DatasetName(Enum):
@@ -17,6 +17,7 @@ class DatasetName(Enum):
     LogiQA = "logiqa"
     GAOKAO_Physics = "gaokao_physics"
     TimeTabling = "timetabling"
+    SubsetSum = "subsetsum"
 
     def __str__(self) -> str:
         return self.value
@@ -29,6 +30,7 @@ class DatasetName(Enum):
             DatasetName.LogiQA: LogiQARecord,
             DatasetName.GAOKAO_Physics: GAOKAORecord,
             DatasetName.TimeTabling: TimeTablingRecord,
+            DatasetName.SubsetSum: SubsetSumRecord,
         }
         return record_cls_map[self]
 
@@ -40,6 +42,7 @@ class DatasetName(Enum):
             DatasetName.LogiQA: LogiQADataset,
             DatasetName.GAOKAO_Physics: GAOKAODataset,
             DatasetName.TimeTabling: TimeTablingDataset,
+            DatasetName.SubsetSum: SubsetSumDataset,
         }
         return dataset_cls_map[self]
 
@@ -127,4 +130,22 @@ class TimeTablingDataset(IDataset):
         return TimeTablingData
 
 
-Dataset = TypeVar("Dataset", GSM8KDataset, ARCDataset, LogiQADataset, GAOKAODataset, TimeTablingDataset)
+class SubsetSumDataset(IDataset):
+    @property
+    def _name(self) -> DatasetName:
+        return DatasetName.SubsetSum
+
+    @property
+    def _data_cls(self) -> Type[Data]:
+        return SubsetSumData
+
+
+Dataset = TypeVar(
+    "Dataset",
+    GSM8KDataset,
+    ARCDataset,
+    LogiQADataset,
+    GAOKAODataset,
+    TimeTablingDataset,
+    SubsetSumDataset,
+)

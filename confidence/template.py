@@ -2,7 +2,7 @@ from abc import ABC, ABCMeta, abstractmethod
 from enum import Enum, EnumMeta
 from typing import Type, assert_never
 
-from .data import ARCData, Data, GAOKAOData, GSM8KData, LogiQAData, TimeTablingData
+from .data import ARCData, Data, GAOKAOData, GSM8KData, LogiQAData, TimeTablingData, SubsetSumData
 
 
 class ABCEnumMeta(ABCMeta, EnumMeta): ...
@@ -143,17 +143,26 @@ class TimeTablingTemplate(ITemplate):
     def prompt(self, data: TimeTablingData) -> str:
         if self == self.simple:
             return f"{data.question}\nPlease provide all feasible schedules that satisfies all constraints one by one."
+
+
+class SubsetSumTemplate(ITemplate):
+    simple = "simple-subsetsum"
+    cot = "cot-subsetsum"
+
+    def prompt(self, data: SubsetSumData) -> str:
+        if self == self.simple:
+            return f"{data.question}\nPlease provide all feasible subsets that meet the requirements one by one and output the number of feasible subsets."
         elif self == self.cot:
-            return f"{data.question}\nPlease provide all feasible schedules that satisfies all constraints one by one. Think step by step before answering."
+            return f"{data.question}\nPlease provide all feasible subsets that meet the requirements one by one and output the number of feasible subsets. Think step by step before answering."
         else:
             assert_never(self)
 
 
-Template = GSM8KTemplate | ARCTemplate | LogiQATemplate | GAOKAOTemplate | TimeTablingTemplate
+Template = GSM8KTemplate | ARCTemplate | LogiQATemplate | GAOKAOTemplate | TimeTablingTemplate | SubsetSumTemplate
 
 
 def string_to_template(string: str) -> Template:
-    template_cls = [GSM8KTemplate, ARCTemplate, LogiQATemplate, GAOKAOTemplate, TimeTablingTemplate]
+    template_cls = [GSM8KTemplate, ARCTemplate, LogiQATemplate, GAOKAOTemplate, TimeTablingTemplate, SubsetSumTemplate]
     for cls in template_cls:
         for t in cls:
             if t.value == string:
