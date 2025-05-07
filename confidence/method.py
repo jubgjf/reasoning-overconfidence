@@ -325,14 +325,12 @@ class Method:
         history_thinking_content = history_thinking_content[: -len("</think>")]
         history_thinking_content += "\n" + random.choice(reflection_patterns)
 
-        if model.model_name in [
-            ModelName.QWEN3_8B_THINK,
-            ModelName.QWEN3_8B_NO_THINK,
-            ModelName.QWEN3_32B_THINK,
-            ModelName.QWEN3_32B_NO_THINK,
-        ]:
-            raise NotImplementedError
-        user_input = model.apply_chat_template([{"role": "user", "content": template.prompt(data)}])
+        if model.model_name in [ModelName.QWEN3_8B_THINK, ModelName.QWEN3_32B_THINK]:
+            user_input = model.apply_chat_template([{"role": "user", "content": template.prompt(data) + " /think"}])
+        elif model.model_name in [ModelName.QWEN3_8B_NO_THINK, ModelName.QWEN3_32B_NO_THINK]:
+            user_input = model.apply_chat_template([{"role": "user", "content": template.prompt(data) + " /no_think"}])
+        else:
+            user_input = model.apply_chat_template([{"role": "user", "content": template.prompt(data)}])
         user_input_with_thinking = user_input + history_thinking_content
         return [
             self._request_fake_reflection(
