@@ -101,7 +101,7 @@ async def main(args: Argument):
     tasks = limit_concurrency(tasks, args.concurrency)
 
     db_logger = Logger(
-        db_name=args.dataset.value if not args.debug else "debug",
+        db_name=db_name,
         table_name=f"{table_name}--evaluate-by-{args.judge_model}",
         record_cls=record_cls,
     )
