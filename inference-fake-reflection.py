@@ -45,7 +45,7 @@ async def request(
         template,
         temperature=0.2,
         history_thinking_content=history_thinking_content,
-        max_tokens=16384,
+        max_tokens=32768,
         no_cot_memory=no_cot_memory,
     )
     return data, response_results
