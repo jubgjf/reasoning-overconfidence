@@ -140,9 +140,6 @@ class Model:
         max_tokens: int = 16384,
         logprobs: bool = False,
     ) -> Result[CompleteAPIResponse, str]:
-        if self.model_name in [ModelName.QWEN3_8B_THINK, ModelName.QWEN3_8B_NO_THINK]:
-            raise NotImplementedError
-
         async def request_once() -> Result[CompleteAPIResponse, str]:
             try:
                 response = await self._client.completions.create(
