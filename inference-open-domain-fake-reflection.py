@@ -33,6 +33,7 @@ class Argument(Tap):
     no_cot_memory: bool = False
     force_update: bool = False
     concurrency: int = 5
+    turn: int | None = None
     debug: bool = False
 
     def configure(self) -> None:
@@ -43,12 +44,14 @@ async def main(args: Argument):
     record_cls = args.dataset.record_cls
 
     # ===== full-reflection chat history =====
+    if args.debug:
+        db_name = "debug"
+    elif args.turn is None:
+        db_name = args.dataset.value
+    else:
+        db_name = f"{args.dataset.value}--turn{args.turn}"
     load_title = f"{args.dataset}--{args.method}--no-cot-memory-{args.no_cot_memory}--{args.template}--{args.model}"
-    db_logger = Logger(
-        db_name=args.dataset.value,
-        table_name=load_title,
-        record_cls=record_cls,
-    )
+    db_logger = Logger(db_name=db_name, table_name=load_title, record_cls=record_cls)
     async with db_logger:
         # ===== dataset =====
         dataset_cls = args.dataset.dataset_cls
@@ -63,12 +66,7 @@ async def main(args: Argument):
         dataset_history_pair = {question_id: (dataset[question_id], turn) for question_id, turn in history.items()}
 
     save_title = f"{args.dataset}--{args.method}--no-cot-memory-{args.no_cot_memory}--{args.template}--{args.model}--{args.fake_type}-reflection"
-    db_logger = Logger(
-        db_name=args.dataset.value if not args.debug else "debug",
-        table_name=save_title,
-        record_cls=record_cls,
-        force_update=args.force_update,
-    )
+    db_logger = Logger(db_name=db_name, table_name=save_title, record_cls=record_cls, force_update=args.force_update)
     async with db_logger:
         # ===== model =====
         model = Model(args.model)
