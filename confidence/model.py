@@ -22,6 +22,8 @@ class ModelName(Enum):
     DEEPSEEK_R1_DISTILL_QWEN2_5_MATH_7B = "dsr1-distill-qwen2.5-math-7b"
     QWEN3_8B_THINK = "qwen3-8b-think"
     QWEN3_8B_NO_THINK = "qwen3-8b-no_think"
+    QWEN3_32B_THINK = "qwen3-32b-think"
+    QWEN3_32B_NO_THINK = "qwen3-32b-no_think"
 
     def __str__(self) -> str:
         return self.value
@@ -46,6 +48,8 @@ class ModelName(Enum):
             return "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"
         elif self in [ModelName.QWEN3_8B_THINK, ModelName.QWEN3_8B_NO_THINK]:
             return "Qwen/Qwen3-8B"
+        elif self in [ModelName.QWEN3_32B_THINK, ModelName.QWEN3_32B_NO_THINK]:
+            return "Qwen/Qwen3-32B"
         else:
             assert_never(self)
 

@@ -103,9 +103,9 @@ class Method:
         no_cot_memory: bool = False,
     ) -> Result[Response, str]:
         # ===== First turn =====
-        if model.model_name in [ModelName.QWEN3_8B_THINK]:
+        if model.model_name in [ModelName.QWEN3_8B_THINK, ModelName.QWEN3_32B_THINK]:
             messages = [{"role": "user", "content": template.prompt(data) + " /think"}]
-        elif model.model_name in [ModelName.QWEN3_8B_NO_THINK]:
+        elif model.model_name in [ModelName.QWEN3_8B_NO_THINK, ModelName.QWEN3_32B_NO_THINK]:
             messages = [{"role": "user", "content": template.prompt(data) + " /no_think"}]
         else:
             messages = [{"role": "user", "content": template.prompt(data)}]
@@ -135,9 +135,9 @@ class Method:
         if no_cot_memory:
             messages[1]["content"] = answer_content
 
-        if model.model_name in [ModelName.QWEN3_8B_THINK]:
+        if model.model_name in [ModelName.QWEN3_8B_THINK, ModelName.QWEN3_32B_THINK]:
             messages.append({"role": "user", "content": self._name.prompt + " /think"})
-        elif model.model_name in [ModelName.QWEN3_8B_NO_THINK]:
+        elif model.model_name in [ModelName.QWEN3_8B_NO_THINK, ModelName.QWEN3_32B_NO_THINK]:
             messages.append({"role": "user", "content": self._name.prompt + " /no_think"})
         else:
             messages.append({"role": "user", "content": self._name.prompt})
@@ -181,7 +181,12 @@ class Method:
         if response_result.is_err():
             return Err(f"Found err in fake reflection completion: {response_result.err_value}")
 
-        if model.model_name in [ModelName.QWEN3_8B_THINK,ModelName.QWEN3_8B_NO_THINK]:
+        if model.model_name in [
+            ModelName.QWEN3_8B_THINK,
+            ModelName.QWEN3_8B_NO_THINK,
+            ModelName.QWEN3_32B_THINK,
+            ModelName.QWEN3_32B_NO_THINK,
+        ]:
             raise NotImplementedError
         messages = [{"role": "user", "content": template.prompt(data)}]
 
@@ -206,7 +211,12 @@ class Method:
         # ===== Second turn (Optional) =====
         if no_cot_memory:
             messages[1]["content"] = answer_content
-        if model.model_name in [ModelName.QWEN3_8B_THINK,ModelName.QWEN3_8B_NO_THINK]:
+        if model.model_name in [
+            ModelName.QWEN3_8B_THINK,
+            ModelName.QWEN3_8B_NO_THINK,
+            ModelName.QWEN3_32B_THINK,
+            ModelName.QWEN3_32B_NO_THINK,
+        ]:
             raise NotImplementedError
         messages.append({"role": "user", "content": self._name.prompt})
         response_result = await model.request(
@@ -267,7 +277,12 @@ class Method:
         for i in range(0, len(thinking_steps_by_reflection), 2):
             thinking_with_reduced_reflection.append(thinking_steps_by_reflection[: i + 1])
 
-        if model.model_name in [ModelName.QWEN3_8B_THINK,ModelName.QWEN3_8B_NO_THINK]:
+        if model.model_name in [
+            ModelName.QWEN3_8B_THINK,
+            ModelName.QWEN3_8B_NO_THINK,
+            ModelName.QWEN3_32B_THINK,
+            ModelName.QWEN3_32B_NO_THINK,
+        ]:
             raise NotImplementedError
         user_input = model.apply_chat_template([{"role": "user", "content": template.prompt(data)}])
         user_input_with_thinking = [user_input + "".join(steps) for steps in thinking_with_reduced_reflection]
@@ -310,7 +325,12 @@ class Method:
         history_thinking_content = history_thinking_content[: -len("</think>")]
         history_thinking_content += "\n" + random.choice(reflection_patterns)
 
-        if model.model_name in [ModelName.QWEN3_8B_THINK,ModelName.QWEN3_8B_NO_THINK]:
+        if model.model_name in [
+            ModelName.QWEN3_8B_THINK,
+            ModelName.QWEN3_8B_NO_THINK,
+            ModelName.QWEN3_32B_THINK,
+            ModelName.QWEN3_32B_NO_THINK,
+        ]:
             raise NotImplementedError
         user_input = model.apply_chat_template([{"role": "user", "content": template.prompt(data)}])
         user_input_with_thinking = user_input + history_thinking_content
