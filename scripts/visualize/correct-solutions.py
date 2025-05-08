@@ -8,7 +8,7 @@ from confidence.dataset import DatasetName
 from confidence.logger import Logger
 from confidence.method import MethodName
 from confidence.model import ModelName
-from confidence.template import TimeTablingTemplate, Template
+from confidence.template import Template, SubsetSumTemplate
 
 
 class Setting(BaseModel):
@@ -17,15 +17,18 @@ class Setting(BaseModel):
 
 
 async def main():
-    judge_model = ModelName.QWQ_32B
-    dataset = DatasetName.TimeTabling
+    judge_model = ModelName.QWEN3_32B_NO_THINK
+    dataset = DatasetName.SubsetSum
     method = MethodName.Verbal_0_100
     no_cot_memory = False
 
     settings = [
-        Setting(model=ModelName.QWQ_32B, template=TimeTablingTemplate.simple),
-        Setting(model=ModelName.QWEN2_5_7B, template=TimeTablingTemplate.simple),
-        Setting(model=ModelName.QWEN2_5_7B, template=TimeTablingTemplate.cot),
+        Setting(model=ModelName.QWEN3_8B_THINK, template=SubsetSumTemplate.simple),
+        Setting(model=ModelName.QWEN3_8B_NO_THINK, template=SubsetSumTemplate.simple),
+        Setting(model=ModelName.QWEN3_8B_NO_THINK, template=SubsetSumTemplate.cot),
+        # Setting(model=ModelName.QWEN3_8B_THINK, template=TimeTablingTemplate.simple),
+        # Setting(model=ModelName.QWEN3_8B_NO_THINK, template=TimeTablingTemplate.simple),
+        # Setting(model=ModelName.QWEN3_8B_NO_THINK, template=TimeTablingTemplate.cot),
     ]
 
     records_list = []
@@ -56,7 +59,12 @@ async def main():
     df = df[df["correct_solution_count"] <= df["answer_count"]]
     df = df[df["total_solution_count"] <= df["answer_count"]]
 
-    df["answer_count_bin"] = df["answer_count"].apply(lambda x: int(x // 50) if int(x // 50) < 8 else 8)
+    if dataset == DatasetName.TimeTabling:
+        df["answer_count_bin"] = df["answer_count"].apply(lambda x: int(x // 50))
+    elif dataset == DatasetName.SubsetSum:
+        df["answer_count_bin"] = df["answer_count"].apply(lambda x: int(x // 50) if int(x // 50) < 6 else 6)
+    else:
+        raise NotImplementedError
 
     df["correct_accuracy"] = df["correct_solution_count"] / df["answer_count"]
     df["total_accuracy"] = df["total_solution_count"] / df["answer_count"]

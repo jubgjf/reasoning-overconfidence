@@ -1,0 +1,190 @@
+import matplotlib.pyplot as plt
+import pandas as pd
+import seaborn as sns
+from pydantic import BaseModel
+from tortoise import run_async
+
+from confidence.dataset import DatasetName
+from confidence.logger import Logger
+from confidence.method import MethodName
+from confidence.model import ModelName
+from confidence.template import Template, TimeTablingTemplate
+
+
+class Setting(BaseModel):
+    model: ModelName
+    template: Template
+
+
+async def main():
+    judge_model = ModelName.QWEN3_32B_NO_THINK
+    dataset = DatasetName.TimeTabling
+    method = MethodName.Verbal_0_100
+    no_cot_memory = False
+
+    settings = [
+        Setting(model=ModelName.QWEN3_8B_THINK, template=TimeTablingTemplate.simple),
+        Setting(model=ModelName.QWEN3_8B_NO_THINK, template=TimeTablingTemplate.simple),
+        Setting(model=ModelName.QWEN3_8B_NO_THINK, template=TimeTablingTemplate.cot),
+    ]
+
+    records_list = []
+    for setting in settings:
+        record_cls = dataset.record_cls
+        db_logger = Logger(
+            db_name=dataset.value,
+            table_name=f"{dataset}--{method}--no-cot-memory-{no_cot_memory}--{setting.template}--{setting.model}--evaluate-by-{judge_model}",
+            record_cls=record_cls,
+        )
+        async with db_logger:
+            records = await db_logger.fetch()
+
+        method_records = [record.model_dump() for record in records]
+        df = pd.DataFrame(method_records)
+        if method == MethodName.Verbal_0_100:
+            df["model_confidence_extracted"] = df["model_confidence_extracted"].apply(lambda x: x / 100)
+        df["setting"] = f"{setting.model}--{setting.template}"
+
+        records_list.append(df)
+
+    df = pd.concat(records_list, ignore_index=True)
+
+    df["correct_solution_count"] = df["eval_result"].apply(lambda x: int(x.split("/")[0]))
+    df["total_solution_count"] = df["eval_result"].apply(lambda x: int(x.split("/")[1]))
+
+    df = df[df["correct_solution_count"] <= df["total_solution_count"]]
+    df = df[df["correct_solution_count"] <= df["answer_count"]]
+    df = df[df["total_solution_count"] <= df["answer_count"]]
+
+    if dataset == DatasetName.TimeTabling:
+        df["answer_count_bin"] = df["answer_count"].apply(lambda x: int(x // 50))
+    elif dataset == DatasetName.SubsetSum:
+        df["answer_count_bin"] = df["answer_count"].apply(lambda x: int(x // 50) if int(x // 50) < 6 else 6)
+    else:
+        raise NotImplementedError
+
+    df["completeness"] = df["correct_solution_count"] / df["answer_count"]
+    df["accuracy"] = df["correct_solution_count"] / df["total_solution_count"]
+
+    df["confidence_bin"] = pd.cut(df["model_confidence_extracted"], bins=10, include_lowest=True, labels=False)
+    grouped = (
+        df.groupby(["setting", "confidence_bin"])
+        .agg(
+            mean_confidence=("model_confidence_extracted", "mean"),
+            mean_accuracy=("accuracy", "mean"),
+            count=("confidence_bin", "size"),
+        )
+        .reset_index()
+    )
+
+    plt.figure()
+    sns.scatterplot(
+        data=df[df["setting"] != "qwen3-8b-think--simple"],
+        x="completeness",
+        y="model_confidence_extracted",
+        hue="setting",
+    )
+    plt.xlabel("completeness")
+    plt.ylabel("confidence")
+    plt.title("completeness vs confidence")
+    plt.show()
+
+    plt.figure()
+    sns.lineplot(
+        data=df[df["setting"] != "qwen3-8b-think--simple"],
+        x="answer_count_bin",
+        y="completeness",
+        hue="setting",
+    )
+    plt.xlabel("answer_count_bin")
+    plt.ylabel("completeness")
+    plt.title("difficulty vs completeness")
+    plt.show()
+
+    plt.figure()
+    sns.lineplot(
+        data=df[df["setting"] != "qwen3-8b-think--simple"],
+        x="answer_count_bin",
+        y="model_confidence_extracted",
+        hue="setting",
+    )
+    plt.xlabel("answer_count_bin")
+    plt.ylabel("confidence")
+    plt.title("difficulty vs confidence")
+    plt.show()
+
+    plt.figure(figsize=(6, 6))
+    sns.lineplot(
+        x="mean_confidence",
+        y="mean_accuracy",
+        hue="setting",
+        data=grouped[grouped["setting"] != "qwen3-8b-think--simple"],
+        marker="o",
+    )
+    plt.plot([0, 1], [0, 1], linestyle="--", color="gray", label="Perfectly Calibrated")
+    plt.xlabel("Mean Predicted Confidence")
+    plt.ylabel("Fraction of Positives (Empirical Accuracy)")
+    plt.title("Reliability Diagram by Setting")
+    plt.xlim(0, 1)
+    plt.ylim(0, 1)
+    plt.legend(title="setting")
+    plt.grid(True)
+    plt.show()
+
+    plt.figure()
+    sns.scatterplot(
+        data=df[df["setting"] != "qwen3-8b-no_think--simple"],
+        x="completeness",
+        y="model_confidence_extracted",
+        hue="setting",
+    )
+    plt.xlabel("completeness")
+    plt.ylabel("confidence")
+    plt.title("completeness vs confidence")
+    plt.show()
+
+    plt.figure()
+    sns.lineplot(
+        data=df[df["setting"] != "qwen3-8b-no_think--simple"],
+        x="answer_count_bin",
+        y="completeness",
+        hue="setting",
+    )
+    plt.xlabel("answer_count_bin")
+    plt.ylabel("completeness")
+    plt.title("difficulty vs completeness")
+    plt.show()
+
+    plt.figure()
+    sns.lineplot(
+        data=df[df["setting"] != "qwen3-8b-no_think--simple"],
+        x="answer_count_bin",
+        y="model_confidence_extracted",
+        hue="setting",
+    )
+    plt.xlabel("answer_count_bin")
+    plt.ylabel("confidence")
+    plt.title("difficulty vs confidence")
+    plt.show()
+
+    plt.figure(figsize=(6, 6))
+    sns.lineplot(
+        x="mean_confidence",
+        y="mean_accuracy",
+        hue="setting",
+        data=grouped[grouped["setting"] != "qwen3-8b-no_think--simple"],
+        marker="o",
+    )
+    plt.plot([0, 1], [0, 1], linestyle="--", color="gray", label="Perfectly Calibrated")
+    plt.xlabel("Mean Predicted Confidence")
+    plt.ylabel("Fraction of Positives (Empirical Accuracy)")
+    plt.title("Reliability Diagram by Setting")
+    plt.xlim(0, 1)
+    plt.ylim(0, 1)
+    plt.legend(title="setting")
+    plt.grid(True)
+    plt.show()
+
+
+if __name__ == "__main__":
+    run_async(main())
