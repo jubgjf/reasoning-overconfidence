@@ -24,6 +24,8 @@ class ModelName(Enum):
     QWEN3_8B_NO_THINK = "qwen3-8b-no_think"
     QWEN3_32B_THINK = "qwen3-32b-think"
     QWEN3_32B_NO_THINK = "qwen3-32b-no_think"
+    LLAMA3_1_8B = "llama3.1-8b"
+    DEEPSEEK_R1_DISTILL_LLAMA3_1_8B = "dsr1-distill-llama3.1-8b"
 
     def __str__(self) -> str:
         return self.value
@@ -50,6 +52,10 @@ class ModelName(Enum):
             return "Qwen/Qwen3-8B"
         elif self in [ModelName.QWEN3_32B_THINK, ModelName.QWEN3_32B_NO_THINK]:
             return "Qwen/Qwen3-32B"
+        elif self == ModelName.LLAMA3_1_8B:
+            return "meta-llama/Llama-3.1-8B-Instruct"
+        elif self == ModelName.DEEPSEEK_R1_DISTILL_LLAMA3_1_8B:
+            return "deepseek-ai/DeepSeek-R1-Distill-Llama-8B"
         else:
             assert_never(self)
 
