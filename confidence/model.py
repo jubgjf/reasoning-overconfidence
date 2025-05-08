@@ -26,6 +26,8 @@ class ModelName(Enum):
     QWEN3_32B_NO_THINK = "qwen3-32b-no_think"
     LLAMA3_1_8B = "llama3.1-8b"
     DEEPSEEK_R1_DISTILL_LLAMA3_1_8B = "dsr1-distill-llama3.1-8b"
+    PHI4_MINI_REASONING = "phi4-mini-reasoning"
+    PHI4_MINI_INSTRUCT = "phi4-mini-instruct"
 
     def __str__(self) -> str:
         return self.value
@@ -56,6 +58,10 @@ class ModelName(Enum):
             return "meta-llama/Llama-3.1-8B-Instruct"
         elif self == ModelName.DEEPSEEK_R1_DISTILL_LLAMA3_1_8B:
             return "deepseek-ai/DeepSeek-R1-Distill-Llama-8B"
+        elif self == ModelName.PHI4_MINI_REASONING:
+            return "microsoft/Phi-4-mini-reasoning"
+        elif self == ModelName.PHI4_MINI_INSTRUCT:
+            return "microsoft/Phi-4-mini-instruct"
         else:
             assert_never(self)
 
