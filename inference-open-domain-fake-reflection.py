@@ -87,7 +87,7 @@ async def main(args: Argument):
                 template=args.template,
                 temperature=0.2,
                 history_thinking_content=split_thinking_answer(turn["assistant_0"])[0],
-                max_tokens=32768,
+                max_tokens=16384,
                 no_cot_memory=args.no_cot_memory,
             )
             for data, turn in dataset_history_pair.values()
