@@ -14,6 +14,7 @@ from confidence.template import TimeTablingTemplate
 def count_reflections(history_thinking_content: str) -> int:
     reflection_patterns = [
         r"^Wait,.*\n\n",
+        r"^But wait,.*\n\n",
         r"^Let me double - check.*\n\n",
         r"^Let me think again.*\n\n",
     ]
@@ -43,9 +44,9 @@ def count_reflections(history_thinking_content: str) -> int:
 
 
 async def main():
-    model = ModelName.QWQ_32B
+    model = ModelName.QWEN3_8B_THINK
     template = TimeTablingTemplate.simple
-    judge_model = ModelName.QWQ_32B
+    judge_model = ModelName.QWEN3_32B_NO_THINK
     dataset = DatasetName.TimeTabling
     method = MethodName.Verbal_0_100
     no_cot_memory = False
@@ -65,7 +66,7 @@ async def main():
         df["model_confidence_extracted"] = df["model_confidence_extracted"].apply(lambda x: x / 100)
 
     df["reflection_times"] = df["model_thinking_response"].apply(count_reflections)
-    df["reflection_times_bin"] = df["reflection_times"].apply(lambda x: int(x // 10) if int(x // 10) < 8 else 8)
+    df["reflection_times_bin"] = df["reflection_times"].apply(lambda x: int(x // 5) if int(x // 5) < 9 else 9)
 
     df["correct_solution_count"] = df["eval_result"].apply(lambda x: int(x.split("/")[0]))
     df["total_solution_count"] = df["eval_result"].apply(lambda x: int(x.split("/")[1]))
@@ -74,35 +75,62 @@ async def main():
     df = df[df["correct_solution_count"] <= df["answer_count"]]
     df = df[df["total_solution_count"] <= df["answer_count"]]
 
-    df["answer_count_bin"] = df["answer_count"].apply(lambda x: int(x // 50) if int(x // 50) < 8 else 8)
+    if dataset == DatasetName.TimeTabling:
+        df["answer_count_bin"] = df["answer_count"].apply(lambda x: int(x // 50))
+        answer_count_bin_range = 10
+    elif dataset == DatasetName.SubsetSum:
+        df["answer_count_bin"] = df["answer_count"].apply(lambda x: int(x // 50) if int(x // 50) < 6 else 6)
+        answer_count_bin_range = 7
+    else:
+        raise NotImplementedError
 
-    df["correct_accuracy"] = df["correct_solution_count"] / df["answer_count"]
-    df["total_accuracy"] = df["total_solution_count"] / df["answer_count"]
+    df["completeness"] = df["correct_solution_count"] / df["answer_count"]
+    df["accuracy"] = df["correct_solution_count"] / df["total_solution_count"]
 
-    df = df[df["reflection_times_bin"] < 7]
+    # plt.figure()
+    # pivot_table = df.pivot_table(
+    #     values="completeness", index="reflection_times_bin", columns="answer_count_bin", aggfunc="mean"
+    # )
+    # sns.heatmap(pivot_table, annot=True, cmap="YlGnBu", fmt=".2f")
+    # plt.xlabel("answer count bin")
+    # plt.ylabel("reflection times bin")
+    # plt.title("reflection vs completeness")
+    # plt.show()
+
+    # plt.figure()
+    # pivot_table = df.pivot_table(
+    #     values="accuracy", index="reflection_times_bin", columns="answer_count_bin", aggfunc="mean"
+    # )
+    # sns.heatmap(pivot_table, annot=True, cmap="YlGnBu", fmt=".2f")
+    # plt.xlabel("answer count bin")
+    # plt.ylabel("reflection times bin")
+    # plt.title("reflection vs accuracy")
+    # plt.show()
+
+    # 只保留数据量大于20的reflection_times_bin
+    df = df[
+        df["reflection_times_bin"].isin(
+            df["reflection_times_bin"].value_counts()[df["reflection_times_bin"].value_counts() > 50].index
+        )
+    ]
+
+    df = df[~df["answer_count_bin"].isin([3, 4, 5, 6, 7])]
+    df["difficulty"] = df["answer_count_bin"].apply(lambda x: "easy" if x < 3 else "hard")
 
     plt.figure()
-    pivot_table = df.pivot_table(
-        values="correct_accuracy", index="reflection_times_bin", columns="answer_count_bin", aggfunc="mean"
-    )
-    sns.heatmap(pivot_table, annot=True, cmap="YlGnBu", fmt=".2f")
-    plt.xlabel("answer count bin")
-    plt.ylabel("reflection times")
-    plt.title("reflection vs answer count")
+    sns.lineplot(data=df[df["difficulty"] == "easy"], x="reflection_times_bin", y="completeness", hue="difficulty")
+    sns.lineplot(data=df[df["difficulty"] == "hard"], x="reflection_times_bin", y="completeness", hue="difficulty")
+    plt.xlabel("reflection times bin")
+    plt.ylabel("completeness")
+    plt.title("reflection vs completeness")
     plt.show()
 
     plt.figure()
-    sns.lineplot(data=df, x="answer_count_bin", y="reflection_times")
-    plt.xlabel("answer count bin")
-    plt.ylabel("reflection times")
-    plt.title("answer count vs reflection")
-    plt.show()
-
-    plt.figure()
-    sns.lineplot(data=df, x="reflection_times", y="correct_accuracy")
-    plt.xlabel("reflection times")
-    plt.ylabel("correct_accuracy")
-    plt.title("acc")
+    sns.lineplot(data=df[df["difficulty"] == "easy"], x="reflection_times_bin", y="accuracy", hue="difficulty")
+    sns.lineplot(data=df[df["difficulty"] == "hard"], x="reflection_times_bin", y="accuracy", hue="difficulty")
+    plt.xlabel("reflection times bin")
+    plt.ylabel("accuracy")
+    plt.title("reflection vs accuracy")
     plt.show()
 
 

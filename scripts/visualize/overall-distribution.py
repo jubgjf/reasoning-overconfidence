@@ -4,7 +4,7 @@ import seaborn as sns
 from pydantic import BaseModel
 from tortoise import run_async
 
-from confidence.template import TimeTablingTemplate, Template
+from confidence.template import TimeTablingTemplate, Template, SubsetSumTemplate
 from confidence.dataset import DatasetName
 from confidence.logger import Logger
 from confidence.method import MethodName
@@ -17,15 +17,18 @@ class Setting(BaseModel):
 
 
 async def main():
-    judge_model = ModelName.QWQ_32B
-    dataset = DatasetName.TimeTabling
+    judge_model = ModelName.QWEN3_32B_NO_THINK
+    dataset = DatasetName.SubsetSum
     method = MethodName.Verbal_0_100
     no_cot_memory = False
 
     settings = [
-        Setting(model=ModelName.QWQ_32B, template=TimeTablingTemplate.simple),
-        Setting(model=ModelName.QWEN2_5_7B, template=TimeTablingTemplate.simple),
-        Setting(model=ModelName.QWEN2_5_7B, template=TimeTablingTemplate.cot),
+        Setting(model=ModelName.QWEN3_8B_THINK, template=SubsetSumTemplate.simple),
+        Setting(model=ModelName.QWEN3_8B_NO_THINK, template=SubsetSumTemplate.simple),
+        Setting(model=ModelName.QWEN3_8B_NO_THINK, template=SubsetSumTemplate.cot),
+        # Setting(model=ModelName.QWEN3_8B_THINK, template=TimeTablingTemplate.simple),
+        # Setting(model=ModelName.QWEN3_8B_NO_THINK, template=TimeTablingTemplate.simple),
+        # Setting(model=ModelName.QWEN3_8B_NO_THINK, template=TimeTablingTemplate.cot),
     ]
 
     records_list = []
