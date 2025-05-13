@@ -1,6 +1,4 @@
-import matplotlib.pyplot as plt
 import pandas as pd
-import seaborn as sns
 from pydantic import BaseModel
 from tortoise import run_async
 
@@ -8,7 +6,7 @@ from confidence.dataset import DatasetName
 from confidence.logger import Logger
 from confidence.method import MethodName
 from confidence.model import ModelName
-from confidence.template import Template, TimeTablingTemplate
+from confidence.template import Template, SubsetSumTemplate
 
 
 class Setting(BaseModel):
@@ -18,13 +16,13 @@ class Setting(BaseModel):
 
 async def main():
     judge_model = ModelName.QWEN3_32B_NO_THINK
-    dataset = DatasetName.TimeTabling
+    dataset = DatasetName.SubsetSum
     method = MethodName.Verbal_0_100
     no_cot_memory = False
 
     settings = [
-        # Setting(model=ModelName.QWEN3_8B_THINK, template=SubsetSumTemplate.simple),
-        Setting(model=ModelName.QWEN3_8B_THINK, template=TimeTablingTemplate.simple),
+        Setting(model=ModelName.QWEN3_8B_THINK, template=SubsetSumTemplate.simple),
+        # Setting(model=ModelName.QWEN3_8B_THINK, template=TimeTablingTemplate.simple),
     ]
 
     records_list = []
@@ -78,38 +76,49 @@ async def main():
     df["scaling"] = df["consistency_choose"].apply(lambda x: "parallel" if x else "none")
     df = df[~((df["scaling"] == "none") & (df["turn"] != 0))]
 
-    # df = df[df["answer_count_bin"] < 3]  # easy
-    # df = df[df["answer_count_bin"] > 7]  # hard
+    if dataset == DatasetName.TimeTabling:
+        # df = df[df["answer_count_bin"] < 3]  # easy
+        # df = df[df["answer_count_bin"] > 7]  # hard
+        pass  # total
+    elif dataset == DatasetName.SubsetSum:
+        # df = df[df["answer_count_bin"] < 2]  # easy
+        df = df[df["answer_count_bin"] > 5]  # hard
+        # pass  # total
+    else:
+        raise NotImplementedError
 
     parallel_completeness_mean = df[df["scaling"] == "parallel"]["completeness"].mean()
     none_completeness_mean = df[df["scaling"] == "none"]["completeness"].mean()
-    print(parallel_completeness_mean, none_completeness_mean)
-    plt.figure()
-    sns.lineplot(data=df, x="answer_count_bin", y="completeness", hue="scaling")
-    plt.xlabel("Answer Count Bin")
-    plt.ylabel("completeness")
-    plt.title("completeness")
-    plt.show()
+    print(f"Parallel Completeness: {parallel_completeness_mean * 100:.2f}")
+    print(f"None Completeness: {none_completeness_mean * 100:.2f}")
+    # plt.figure()
+    # sns.lineplot(data=df, x="answer_count_bin", y="completeness", hue="scaling")
+    # plt.xlabel("Answer Count Bin")
+    # plt.ylabel("completeness")
+    # plt.title("completeness")
+    # plt.show()
 
     parallel_accuracy_mean = df[df["scaling"] == "parallel"]["accuracy"].mean()
     none_accuracy_mean = df[df["scaling"] == "none"]["accuracy"].mean()
-    print(parallel_accuracy_mean, none_accuracy_mean)
-    plt.figure()
-    sns.lineplot(data=df, x="answer_count_bin", y="accuracy", hue="scaling")
-    plt.xlabel("Answer Count Bin")
-    plt.ylabel("accuracy")
-    plt.title("accuracy")
-    plt.show()
+    print(f"Parallel Accuracy: {parallel_accuracy_mean * 100:.2f}")
+    print(f"None Accuracy: {none_accuracy_mean * 100:.2f}")
+    # plt.figure()
+    # sns.lineplot(data=df, x="answer_count_bin", y="accuracy", hue="scaling")
+    # plt.xlabel("Answer Count Bin")
+    # plt.ylabel("accuracy")
+    # plt.title("accuracy")
+    # plt.show()
 
     parallel_confidence_mean = df[df["scaling"] == "parallel"]["model_confidence_extracted"].mean()
     none_confidence_mean = df[df["scaling"] == "none"]["model_confidence_extracted"].mean()
-    print(parallel_confidence_mean, none_confidence_mean)
-    plt.figure()
-    sns.scatterplot(df, x="model_confidence_extracted", y="completeness", hue="scaling")
-    plt.xlabel("conf")
-    plt.ylabel("comp")
-    plt.title("accuracy")
-    plt.show()
+    print(f"Parallel Confidence: {parallel_confidence_mean}")
+    print(f"None Confidence: {none_confidence_mean}")
+    # plt.figure()
+    # sns.scatterplot(df, x="model_confidence_extracted", y="completeness", hue="scaling")
+    # plt.xlabel("conf")
+    # plt.ylabel("comp")
+    # plt.title("accuracy")
+    # plt.show()
 
 
 if __name__ == "__main__":
