@@ -8,7 +8,7 @@ from confidence.dataset import DatasetName
 from confidence.logger import Logger
 from confidence.method import MethodName
 from confidence.model import ModelName
-from confidence.template import Template, TimeTablingTemplate
+from confidence.template import Template, SubsetSumTemplate
 
 
 class Setting(BaseModel):
@@ -18,14 +18,15 @@ class Setting(BaseModel):
 
 async def main():
     judge_model = ModelName.QWEN3_32B_NO_THINK
-    dataset = DatasetName.TimeTabling
+    dataset = DatasetName.SubsetSum
+    # dataset = DatasetName.TimeTabling
     method = MethodName.Verbal_0_100
     no_cot_memory = False
 
     settings = [
-        Setting(model=ModelName.QWEN3_8B_THINK, template=TimeTablingTemplate.simple),
-        Setting(model=ModelName.QWEN3_8B_NO_THINK, template=TimeTablingTemplate.simple),
-        Setting(model=ModelName.QWEN3_8B_NO_THINK, template=TimeTablingTemplate.cot),
+        Setting(model=ModelName.QWEN3_8B_THINK, template=SubsetSumTemplate.simple),
+        Setting(model=ModelName.QWEN3_8B_NO_THINK, template=SubsetSumTemplate.simple),
+        Setting(model=ModelName.QWEN3_8B_NO_THINK, template=SubsetSumTemplate.cot),
     ]
 
     records_list = []
@@ -43,7 +44,10 @@ async def main():
         df = pd.DataFrame(method_records)
         if method == MethodName.Verbal_0_100:
             df["model_confidence_extracted"] = df["model_confidence_extracted"].apply(lambda x: x / 100)
-        df["setting"] = f"{setting.model}--{setting.template}"
+        if isinstance(setting.template, SubsetSumTemplate):
+            df["setting"] = f"{setting.model}--{setting.template.value.replace('-subsetsum', '')}"
+        else:
+            df["setting"] = f"{setting.model}--{setting.template}"
 
         records_list.append(df)
 

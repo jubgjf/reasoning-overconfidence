@@ -8,7 +8,7 @@ from confidence.dataset import DatasetName
 from confidence.logger import Logger
 from confidence.method import MethodName
 from confidence.model import ModelName
-from confidence.template import Template, TimeTablingTemplate
+from confidence.template import Template, TimeTablingTemplate, SubsetSumTemplate
 
 
 class Setting(BaseModel):
@@ -18,13 +18,13 @@ class Setting(BaseModel):
 
 async def main():
     judge_model = ModelName.QWEN3_32B_NO_THINK
-    dataset = DatasetName.TimeTabling
+    dataset = DatasetName.SubsetSum
     method = MethodName.Verbal_0_100
     no_cot_memory = False
 
     settings = [
-        # Setting(model=ModelName.QWEN3_8B_THINK, template=SubsetSumTemplate.simple),
-        Setting(model=ModelName.QWEN3_8B_THINK, template=TimeTablingTemplate.simple),
+        Setting(model=ModelName.QWEN3_8B_THINK, template=SubsetSumTemplate.simple),
+        # Setting(model=ModelName.QWEN3_8B_THINK, template=TimeTablingTemplate.simple),
     ]
 
     records_list = []
@@ -80,38 +80,49 @@ async def main():
     df["completeness"] = df["correct_solution_count"] / df["answer_count"]
     df["accuracy"] = df["correct_solution_count"] / df["total_solution_count"]
 
-    # df = df[df["answer_count_bin"] < 3]  # easy
-    # df = df[df["answer_count_bin"] > 7]  # hard
+    if dataset == DatasetName.TimeTabling:
+        # df = df[df["answer_count_bin"] < 3]  # easy
+        # df = df[df["answer_count_bin"] > 7]  # hard
+        pass  # total
+    elif dataset == DatasetName.SubsetSum:
+        # df = df[df["answer_count_bin"] < 2]  # easy
+        # df = df[df["answer_count_bin"] > 5]  # hard
+        pass  # total
+    else:
+        raise NotImplementedError
 
     vertical_completeness_mean = df[df["scaling"] == "vertical"]["completeness"].mean()
     none_completeness_mean = df[df["scaling"] == "none"]["completeness"].mean()
-    print(vertical_completeness_mean, none_completeness_mean)
-    plt.figure()
-    sns.lineplot(data=df, x="answer_count_bin", y="completeness", hue="scaling")
-    plt.xlabel("Answer Count Bin")
-    plt.ylabel("completeness")
-    plt.title("completeness")
-    plt.show()
+    print(f"Vertical Completeness: {vertical_completeness_mean * 100:.2f}")
+    print(f"None Completeness: {none_completeness_mean * 100:.2f}")
+    # plt.figure()
+    # sns.lineplot(data=df, x="answer_count_bin", y="completeness", hue="scaling")
+    # plt.xlabel("Answer Count Bin")
+    # plt.ylabel("completeness")
+    # plt.title("completeness")
+    # plt.show()
 
     vertical_accuracy_mean = df[df["scaling"] == "vertical"]["accuracy"].mean()
     none_accuracy_mean = df[df["scaling"] == "none"]["accuracy"].mean()
-    print(vertical_accuracy_mean, none_accuracy_mean)
-    plt.figure()
-    sns.lineplot(data=df, x="answer_count_bin", y="accuracy", hue="scaling")
-    plt.xlabel("Answer Count Bin")
-    plt.ylabel("accuracy")
-    plt.title("accuracy")
-    plt.show()
+    print(f"Vertical Accuracy: {vertical_accuracy_mean * 100:.2f}")
+    print(f"None Accuracy: {none_accuracy_mean * 100:.2f}")
+    # plt.figure()
+    # sns.lineplot(data=df, x="answer_count_bin", y="accuracy", hue="scaling")
+    # plt.xlabel("Answer Count Bin")
+    # plt.ylabel("accuracy")
+    # plt.title("accuracy")
+    # plt.show()
 
     vertical_confidence_mean = df[df["scaling"] == "vertical"]["model_confidence_extracted"].mean()
     none_confidence_mean = df[df["scaling"] == "none"]["model_confidence_extracted"].mean()
-    print(vertical_confidence_mean, none_confidence_mean)
-    plt.figure()
-    sns.scatterplot(df, x="model_confidence_extracted", y="completeness", hue="scaling")
-    plt.xlabel("confidence")
-    plt.ylabel("completeness")
-    plt.title("confidence vs completeness")
-    plt.show()
+    print(f"Vertical Confidence: {vertical_confidence_mean}")
+    print(f"None Confidence: {none_confidence_mean}")
+    # plt.figure()
+    # sns.scatterplot(df, x="model_confidence_extracted", y="completeness", hue="scaling")
+    # plt.xlabel("confidence")
+    # plt.ylabel("completeness")
+    # plt.title("confidence vs completeness")
+    # plt.show()
 
 
 if __name__ == "__main__":
