@@ -15,6 +15,7 @@ from transformers import AutoTokenizer
 
 class ModelName(Enum):
     QWEN2_5_7B = "qwen2.5-7b"
+    QWEN2_5_32B = "qwen2.5-32b"
     QWEN2_5_72B = "qwen2.5-72b"
     LLAMA3_3_70B = "llama3.3-70b"
     QWQ_32B = "qwq-32b"
@@ -40,6 +41,8 @@ class ModelName(Enum):
     def hf_name(self) -> str:
         if self == ModelName.QWEN2_5_7B:
             return "Qwen/Qwen2.5-7B-Instruct"
+        if self == ModelName.QWEN2_5_32B:
+            return "Qwen/Qwen2.5-32B-Instruct"
         elif self == ModelName.QWEN2_5_72B:
             return "Qwen/Qwen2.5-72B-Instruct"
         elif self == ModelName.LLAMA3_3_70B:
