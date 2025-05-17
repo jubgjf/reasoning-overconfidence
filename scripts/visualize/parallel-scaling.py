@@ -6,7 +6,7 @@ from confidence.dataset import DatasetName
 from confidence.logger import Logger
 from confidence.method import MethodName
 from confidence.model import ModelName
-from confidence.template import Template, SubsetSumTemplate
+from confidence.template import Template, SubsetSumTemplate, TimeTablingTemplate
 
 
 class Setting(BaseModel):
@@ -16,13 +16,13 @@ class Setting(BaseModel):
 
 async def main():
     judge_model = ModelName.QWEN3_32B_NO_THINK
-    dataset = DatasetName.SubsetSum
+    dataset = DatasetName.TimeTabling
     method = MethodName.Verbal_0_100
     no_cot_memory = False
 
     settings = [
-        Setting(model=ModelName.QWEN3_8B_THINK, template=SubsetSumTemplate.simple),
-        # Setting(model=ModelName.QWEN3_8B_THINK, template=TimeTablingTemplate.simple),
+        # Setting(model=ModelName.QWEN3_8B_THINK, template=SubsetSumTemplate.simple),
+        Setting(model=ModelName.QWEN3_8B_THINK, template=TimeTablingTemplate.simple),
     ]
 
     records_list = []
@@ -82,8 +82,8 @@ async def main():
         pass  # total
     elif dataset == DatasetName.SubsetSum:
         # df = df[df["answer_count_bin"] < 2]  # easy
-        df = df[df["answer_count_bin"] > 5]  # hard
-        # pass  # total
+        # df = df[df["answer_count_bin"] > 5]  # hard
+        pass  # total
     else:
         raise NotImplementedError
 

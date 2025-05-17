@@ -1,10 +1,11 @@
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import seaborn as sns
 from pydantic import BaseModel
 from tortoise import run_async
 
-from confidence.template import TimeTablingTemplate, Template, SubsetSumTemplate
+from confidence.template import TimeTablingTemplate, Template
 from confidence.dataset import DatasetName
 from confidence.logger import Logger
 from confidence.method import MethodName
@@ -18,17 +19,14 @@ class Setting(BaseModel):
 
 async def main():
     judge_model = ModelName.QWEN3_32B_NO_THINK
-    dataset = DatasetName.SubsetSum
+    dataset = DatasetName.TimeTabling
     method = MethodName.Verbal_0_100
     no_cot_memory = False
 
     settings = [
-        Setting(model=ModelName.QWEN3_8B_THINK, template=SubsetSumTemplate.simple),
-        Setting(model=ModelName.QWEN3_8B_NO_THINK, template=SubsetSumTemplate.simple),
-        Setting(model=ModelName.QWEN3_8B_NO_THINK, template=SubsetSumTemplate.cot),
-        # Setting(model=ModelName.QWEN3_8B_THINK, template=TimeTablingTemplate.simple),
-        # Setting(model=ModelName.QWEN3_8B_NO_THINK, template=TimeTablingTemplate.simple),
-        # Setting(model=ModelName.QWEN3_8B_NO_THINK, template=TimeTablingTemplate.cot),
+        Setting(model=ModelName.QWEN3_8B_THINK, template=TimeTablingTemplate.simple),
+        Setting(model=ModelName.QWEN3_8B_NO_THINK, template=TimeTablingTemplate.simple),
+        Setting(model=ModelName.QWEN3_8B_NO_THINK, template=TimeTablingTemplate.cot),
     ]
 
     records_list = []
@@ -52,14 +50,19 @@ async def main():
 
     df = pd.concat(records_list)
 
-    bins = [i / 10 for i in range(11)]
+    df.loc[df["setting"] == "qwen3-8b-no_think--cot", "setting"] = "Short-CoT"
+    df.loc[df["setting"] == "qwen3-8b-no_think--simple", "setting"] = "no-CoT"
+    df.loc[df["setting"] == "qwen3-8b-think--simple", "setting"] = "Long-CoT"
 
-    plt.figure(figsize=(10, 6))
-    sns.histplot(df, x="model_confidence_extracted", hue="setting", bins=bins, multiple="dodge", alpha=0.25)
-    plt.xlim(0 - 0.05, 1 + 0.05)
-    plt.xlabel("Confidence")
+    bins = np.linspace(0, 1, 11)
+    df["confidence_bin"] = pd.cut(df["model_confidence_extracted"], bins=bins, include_lowest=True, right=True)
+    df["bin_right"] = df["confidence_bin"].apply(lambda x: x.right)
+    grouped = df.groupby(["bin_right", "setting"]).size().reset_index(name="count")
+    plt.figure(figsize=(8, 4))
+    sns.barplot(data=grouped, x="bin_right", y="count", hue="setting", palette="muted")
+    plt.xlabel("Confidence (bin right edge)")
     plt.ylabel("Frequency")
-    plt.title(f"Confidence Distribution Comparison\n{dataset}")
+    # plt.title(f"Overall Confidence Distribution\n{dataset}")
     plt.tight_layout()
     plt.show()
 
