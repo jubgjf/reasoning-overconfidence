@@ -8,7 +8,7 @@ from confidence.dataset import DatasetName
 from confidence.logger import Logger
 from confidence.method import MethodName
 from confidence.model import ModelName
-from confidence.template import TimeTablingTemplate
+from confidence.template import SubsetSumTemplate, TimeTablingTemplate
 
 
 def count_reflections(history_thinking_content: str) -> int:
@@ -45,9 +45,11 @@ def count_reflections(history_thinking_content: str) -> int:
 
 async def main():
     model = ModelName.QWEN3_8B_THINK
-    template = TimeTablingTemplate.simple
+    template = SubsetSumTemplate.simple
+    # template = TimeTablingTemplate.simple
     judge_model = ModelName.QWEN3_32B_NO_THINK
-    dataset = DatasetName.TimeTabling
+    dataset = DatasetName.SubsetSum
+    # dataset = DatasetName.TimeTabling
     method = MethodName.Verbal_0_100
     no_cot_memory = False
 
@@ -84,53 +86,37 @@ async def main():
     else:
         raise NotImplementedError
 
-    df["completeness"] = df["correct_solution_count"] / df["answer_count"]
-    df["accuracy"] = df["correct_solution_count"] / df["total_solution_count"]
+    df["recall"] = df["correct_solution_count"] / df["answer_count"]
+    df["precision"] = df["correct_solution_count"] / df["total_solution_count"]
 
-    # plt.figure()
-    # pivot_table = df.pivot_table(
-    #     values="completeness", index="reflection_times_bin", columns="answer_count_bin", aggfunc="mean"
-    # )
-    # sns.heatmap(pivot_table, annot=True, cmap="YlGnBu", fmt=".2f")
-    # plt.xlabel("answer count bin")
-    # plt.ylabel("reflection times bin")
-    # plt.title("reflection vs completeness")
-    # plt.show()
-
-    # plt.figure()
-    # pivot_table = df.pivot_table(
-    #     values="accuracy", index="reflection_times_bin", columns="answer_count_bin", aggfunc="mean"
-    # )
-    # sns.heatmap(pivot_table, annot=True, cmap="YlGnBu", fmt=".2f")
-    # plt.xlabel("answer count bin")
-    # plt.ylabel("reflection times bin")
-    # plt.title("reflection vs accuracy")
-    # plt.show()
-
-    # 只保留数据量大于20的reflection_times_bin
+    # 只保留数据量大于50的reflection_times_bin
     df = df[
         df["reflection_times_bin"].isin(
             df["reflection_times_bin"].value_counts()[df["reflection_times_bin"].value_counts() > 50].index
         )
     ]
 
-    df = df[~df["answer_count_bin"].isin([3, 4, 5, 6, 7])]
-    df["difficulty"] = df["answer_count_bin"].apply(lambda x: "easy" if x < 3 else "hard")
+    if dataset == DatasetName.TimeTabling:
+        df = df[~df["answer_count_bin"].isin([3, 4, 5, 6, 7])]
+        df["difficulty"] = df["answer_count_bin"].apply(lambda x: "easy" if x < 3 else "hard")
+    elif dataset == DatasetName.SubsetSum:
+        df = df[~df["answer_count_bin"].isin([2, 3, 4, 5])]
+        df["difficulty"] = df["answer_count_bin"].apply(lambda x: "easy" if x < 2 else "hard")
 
     plt.figure()
-    sns.lineplot(data=df[df["difficulty"] == "easy"], x="reflection_times_bin", y="completeness", hue="difficulty")
-    sns.lineplot(data=df[df["difficulty"] == "hard"], x="reflection_times_bin", y="completeness", hue="difficulty")
-    plt.xlabel("reflection times bin")
-    plt.ylabel("completeness")
-    plt.title("reflection vs completeness")
+    sns.lineplot(data=df, x="reflection_times_bin", y="recall", hue="difficulty")
+    plt.xlabel("Reflection Times Bin")
+    plt.ylabel("Recall")
+    # plt.title("TimeTabling")
+    plt.title("SubsetSum")
     plt.show()
 
     plt.figure()
-    sns.lineplot(data=df[df["difficulty"] == "easy"], x="reflection_times_bin", y="accuracy", hue="difficulty")
-    sns.lineplot(data=df[df["difficulty"] == "hard"], x="reflection_times_bin", y="accuracy", hue="difficulty")
-    plt.xlabel("reflection times bin")
-    plt.ylabel("accuracy")
-    plt.title("reflection vs accuracy")
+    sns.lineplot(data=df, x="reflection_times_bin", y="precision", hue="difficulty")
+    plt.xlabel("Reflection Times Bin")
+    plt.ylabel("Precision")
+    # plt.title("TimeTabling")
+    plt.title("SubsetSum")
     plt.show()
 
 

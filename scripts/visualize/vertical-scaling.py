@@ -18,13 +18,13 @@ class Setting(BaseModel):
 
 async def main():
     judge_model = ModelName.QWEN3_32B_NO_THINK
-    dataset = DatasetName.SubsetSum
+    dataset = DatasetName.TimeTabling
     method = MethodName.Verbal_0_100
     no_cot_memory = False
 
     settings = [
-        Setting(model=ModelName.QWEN3_8B_THINK, template=SubsetSumTemplate.simple),
-        # Setting(model=ModelName.QWEN3_8B_THINK, template=TimeTablingTemplate.simple),
+        # Setting(model=ModelName.QWEN3_8B_THINK, template=SubsetSumTemplate.simple),
+        Setting(model=ModelName.QWEN3_8B_THINK, template=TimeTablingTemplate.simple),
     ]
 
     records_list = []

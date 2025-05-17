@@ -8,7 +8,7 @@ from confidence.dataset import DatasetName
 from confidence.logger import Logger
 from confidence.method import MethodName
 from confidence.model import ModelName
-from confidence.template import Template, SubsetSumTemplate
+from confidence.template import Template, SubsetSumTemplate, TimeTablingTemplate
 
 
 class Setting(BaseModel):
@@ -24,6 +24,9 @@ async def main():
     no_cot_memory = False
 
     settings = [
+        # Setting(model=ModelName.QWEN3_8B_THINK, template=TimeTablingTemplate.simple),
+        # Setting(model=ModelName.QWEN3_8B_NO_THINK, template=TimeTablingTemplate.simple),
+        # Setting(model=ModelName.QWEN3_8B_NO_THINK, template=TimeTablingTemplate.cot),
         Setting(model=ModelName.QWEN3_8B_THINK, template=SubsetSumTemplate.simple),
         Setting(model=ModelName.QWEN3_8B_NO_THINK, template=SubsetSumTemplate.simple),
         Setting(model=ModelName.QWEN3_8B_NO_THINK, template=SubsetSumTemplate.cot),
@@ -67,126 +70,41 @@ async def main():
     else:
         raise NotImplementedError
 
-    df["completeness"] = df["correct_solution_count"] / df["answer_count"]
-    df["accuracy"] = df["correct_solution_count"] / df["total_solution_count"]
+    df["recall"] = df["correct_solution_count"] / df["answer_count"]
+    df["precision"] = df["correct_solution_count"] / df["total_solution_count"]
+
+    df.loc[df["setting"] == "qwen3-8b-no_think--cot", "setting"] = "Short-CoT"
+    df.loc[df["setting"] == "qwen3-8b-no_think--simple", "setting"] = "no-CoT"
+    df.loc[df["setting"] == "qwen3-8b-think--simple", "setting"] = "Long-CoT"
 
     df["confidence_bin"] = pd.cut(df["model_confidence_extracted"], bins=10, include_lowest=True, labels=False)
     grouped = (
         df.groupby(["setting", "confidence_bin"])
         .agg(
             mean_confidence=("model_confidence_extracted", "mean"),
-            mean_accuracy=("accuracy", "mean"),
+            mean_precision=("precision", "mean"),
             count=("confidence_bin", "size"),
         )
         .reset_index()
     )
 
-    plt.figure()
-    sns.scatterplot(
-        data=df[df["setting"] != "qwen3-8b-think--simple"],
-        x="completeness",
-        y="model_confidence_extracted",
-        hue="setting",
-    )
-    plt.xlabel("completeness")
-    plt.ylabel("confidence")
-    plt.title("completeness vs confidence")
-    plt.show()
-
-    plt.figure()
-    sns.lineplot(
-        data=df[df["setting"] != "qwen3-8b-think--simple"],
-        x="answer_count_bin",
-        y="completeness",
-        hue="setting",
-    )
-    plt.xlabel("answer_count_bin")
-    plt.ylabel("completeness")
-    plt.title("difficulty vs completeness")
-    plt.show()
-
-    plt.figure()
-    sns.lineplot(
-        data=df[df["setting"] != "qwen3-8b-think--simple"],
-        x="answer_count_bin",
-        y="model_confidence_extracted",
-        hue="setting",
-    )
-    plt.xlabel("answer_count_bin")
-    plt.ylabel("confidence")
-    plt.title("difficulty vs confidence")
-    plt.show()
-
-    plt.figure(figsize=(6, 6))
+    plt.figure(figsize=(5, 5))
     sns.lineplot(
         x="mean_confidence",
-        y="mean_accuracy",
+        y="mean_precision",
         hue="setting",
-        data=grouped[grouped["setting"] != "qwen3-8b-think--simple"],
+        data=grouped,
         marker="o",
     )
     plt.plot([0, 1], [0, 1], linestyle="--", color="gray", label="Perfectly Calibrated")
-    plt.xlabel("Mean Predicted Confidence")
-    plt.ylabel("Fraction of Positives (Empirical Accuracy)")
-    plt.title("Reliability Diagram by Setting")
+    plt.xlabel("Confidence")
+    plt.ylabel("Precision")
     plt.xlim(0, 1)
     plt.ylim(0, 1)
     plt.legend(title="setting")
     plt.grid(True)
-    plt.show()
-
-    plt.figure()
-    sns.scatterplot(
-        data=df[df["setting"] != "qwen3-8b-no_think--simple"],
-        x="completeness",
-        y="model_confidence_extracted",
-        hue="setting",
-    )
-    plt.xlabel("completeness")
-    plt.ylabel("confidence")
-    plt.title("completeness vs confidence")
-    plt.show()
-
-    plt.figure()
-    sns.lineplot(
-        data=df[df["setting"] != "qwen3-8b-no_think--simple"],
-        x="answer_count_bin",
-        y="completeness",
-        hue="setting",
-    )
-    plt.xlabel("answer_count_bin")
-    plt.ylabel("completeness")
-    plt.title("difficulty vs completeness")
-    plt.show()
-
-    plt.figure()
-    sns.lineplot(
-        data=df[df["setting"] != "qwen3-8b-no_think--simple"],
-        x="answer_count_bin",
-        y="model_confidence_extracted",
-        hue="setting",
-    )
-    plt.xlabel("answer_count_bin")
-    plt.ylabel("confidence")
-    plt.title("difficulty vs confidence")
-    plt.show()
-
-    plt.figure(figsize=(6, 6))
-    sns.lineplot(
-        x="mean_confidence",
-        y="mean_accuracy",
-        hue="setting",
-        data=grouped[grouped["setting"] != "qwen3-8b-no_think--simple"],
-        marker="o",
-    )
-    plt.plot([0, 1], [0, 1], linestyle="--", color="gray", label="Perfectly Calibrated")
-    plt.xlabel("Mean Predicted Confidence")
-    plt.ylabel("Fraction of Positives (Empirical Accuracy)")
-    plt.title("Reliability Diagram by Setting")
-    plt.xlim(0, 1)
-    plt.ylim(0, 1)
-    plt.legend(title="setting")
-    plt.grid(True)
+    plt.title("SubsetSum")
+    # plt.title("TimeTabling")
     plt.show()
 
 
