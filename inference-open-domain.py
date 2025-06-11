@@ -21,6 +21,7 @@ class Argument(Tap):
     dataset: DatasetName = DatasetName.TimeTabling
     template: Template = TimeTablingTemplate.simple
     method: MethodName = MethodName.Verbal_0_100
+    temperature: float = 0.2
     max_samples: int | None = None
     no_cot_memory: bool = False
     force_update: bool = False
@@ -37,17 +38,18 @@ async def request(
     model: Model,
     template: Template,
     data: Data,
+    temperature: float,
     no_cot_memory: bool = False,
 ) -> tuple[Data, Result[Response, str]]:
     response_result = await method.request(
-        model, data, template, temperature=0.2, max_tokens=32768, no_cot_memory=no_cot_memory
+        model, data, template, temperature=temperature, max_tokens=32768, no_cot_memory=no_cot_memory
     )
     return data, response_result
 
 
 async def main(args: Argument):
     record_cls = args.dataset.record_cls
-    title = f"{args.dataset}--{args.method}--no-cot-memory-{args.no_cot_memory}--{args.template}--{args.model}"
+    title = f"{args.dataset}--{args.method}--no-cot-memory-{args.no_cot_memory}--{args.template}--{args.model}--{args.temperature}"
     if args.debug:
         db_name = "debug"
     elif args.turn is None:
@@ -79,7 +81,14 @@ async def main(args: Argument):
 
         # ===== task =====
         tasks = [
-            request(method=method, model=model, template=args.template, data=data, no_cot_memory=args.no_cot_memory)
+            request(
+                method=method,
+                model=model,
+                template=args.template,
+                data=data,
+                temperature=args.temperature,
+                no_cot_memory=args.no_cot_memory,
+            )
             for data in dataset
         ]
         tasks = limit_concurrency(tasks, args.concurrency)
