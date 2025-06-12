@@ -144,13 +144,13 @@ if __name__ == "__main__":
 
     server_process, port = launch_server_cmd(
         (
-            "python3 -m sglang.launch_server"
-            "--tp 8"
-            "--dp 1"
-            f"--model-path {args.model_name_or_path}"
-            f"--served-model-name {args.model}"
-            "--reasoning-parser qwen3"
-            "--host 0.0.0.0"
+            "python3 -m sglang.launch_server "
+            "--tp 8 "
+            "--dp 1 "
+            f"--model-path {args.model_name_or_path} "
+            f"--served-model-name {args.model} "
+            "--reasoning-parser qwen3 "
+            "--host 0.0.0.0 "
             "--port 33333"
         )
     )
