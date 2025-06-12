@@ -44,6 +44,8 @@ class TimeTablingTemplate(ITemplate):
                 "The question is\n"
                 f"{data.question}\n"
                 "You must output all feasible solutions without using ellipsis, etc."
+                "Please note that the examples I gave you are just to show the format, "
+                "the actual number of answers may be more than the examples shown."
             )
         elif self == self.cot:
             return (
@@ -68,6 +70,8 @@ class TimeTablingTemplate(ITemplate):
                 "The question is\n"
                 f"{data.question}\n"
                 "You must output all feasible solutions without using ellipsis, etc."
+                "Please note that the examples I gave you are just to show the format, "
+                "the actual number of answers may be more than the examples shown."
                 "Think step by step before answering."
             )
         else:
@@ -92,6 +96,8 @@ class SubsetSumTemplate(ITemplate):
                 "The question is\n"
                 f"{data.question}\n"
                 "You must output all feasible solutions without using ellipsis, etc."
+                "Please note that the examples I gave you are just to show the format, "
+                "the actual number of answers may be more than the examples shown."
             )
         elif self == self.cot:
             return (
@@ -106,6 +112,8 @@ class SubsetSumTemplate(ITemplate):
                 "The question is\n"
                 f"{data.question}\n"
                 "You must output all feasible solutions without using ellipsis, etc."
+                "Please note that the examples I gave you are just to show the format, "
+                "the actual number of answers may be more than the examples shown."
                 "Think step by step before answering."
             )
         else:
