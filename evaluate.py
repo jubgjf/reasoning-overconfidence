@@ -1,20 +1,21 @@
 import asyncio
+import os
+import re
 from enum import Enum
 
 from loguru import logger
-
-import re
-from result import Ok, Err, Result
+from result import Err, Ok, Result
+from sglang.utils import launch_server_cmd, terminate_process, wait_for_server
 from tap import Tap
 from tortoise import run_async
 from tqdm.auto import tqdm
 
-from confidence.utils import split_thinking_answer, limit_concurrency
-from confidence.template import TimeTablingTemplate, Template, string_to_template
 from confidence.dataset import DatasetName
 from confidence.logger import Logger
 from confidence.method import MethodName
-from confidence.model import ModelName, Model
+from confidence.model import Model, ModelName
+from confidence.template import Template, TimeTablingTemplate, string_to_template
+from confidence.utils import limit_concurrency, split_thinking_answer
 
 
 class FakeType(Enum):
@@ -27,11 +28,13 @@ class FakeType(Enum):
 
 
 class Argument(Tap):
-    model: ModelName = ModelName.QWQ_32B
-    judge_model: ModelName = ModelName.QWQ_32B
+    model: ModelName = ModelName.QWEN3_8B_THINK
+    judge_model: ModelName = ModelName.QWEN3_32B_NO_THINK
+    judge_model_name_or_path: str = "Qwen/Qwen3-32B"
     dataset: DatasetName = DatasetName.TimeTabling
     template: Template = TimeTablingTemplate.simple
     method: MethodName = MethodName.Verbal_0_100
+    temperature: float = 0.2
     fake_type: FakeType = FakeType.less
     no_cot_memory: bool = False
     concurrency: int = 200
@@ -80,12 +83,12 @@ async def evaluate(judge_model: Model, record: dict) -> Result[tuple[int, int, d
 
 
 async def main(args: Argument):
-    judge_model = Model(args.judge_model)
+    judge_model = Model(args.judge_model, args.judge_model_name_or_path)
     record_cls = args.dataset.record_cls
     if args.fake_type != FakeType.none:
-        table_name = f"{args.dataset}--{args.method}--no-cot-memory-{args.no_cot_memory}--{args.template}--{args.model}--{args.fake_type}-reflection"
+        table_name = f"{args.dataset}--{args.method}--no-cot-memory-{args.no_cot_memory}--{args.template}--{args.model}--{args.temperature}--{args.fake_type}-reflection"
     else:
-        table_name = f"{args.dataset}--{args.method}--no-cot-memory-{args.no_cot_memory}--{args.template}--{args.model}"
+        table_name = f"{args.dataset}--{args.method}--no-cot-memory-{args.no_cot_memory}--{args.template}--{args.model}--{args.temperature}"
     if args.debug:
         db_name = "debug"
     elif args.turn is None:
@@ -122,4 +125,23 @@ async def main(args: Argument):
 if __name__ == "__main__":
     args = Argument().parse_args()
 
+    server_process, port = launch_server_cmd(
+        (
+            "python3 -m sglang.launch_server"
+            "--tp 8"
+            "--dp 1"
+            f"--model-path {args.judge_model_name_or_path}"
+            f"--served-model-name {args.model}"
+            "--reasoning-parser qwen3"
+            "--host 0.0.0.0"
+            "--port 33333"
+        )
+    )
+    wait_for_server(f"http://localhost:{port}")
+
+    os.environ["BASE_URL"] = f"http://localhost:{port}/v1"
+    os.environ["API_KEY"] = "sglang"
+
     run_async(main(args))
+
+    terminate_process(server_process)

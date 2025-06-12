@@ -1,7 +1,6 @@
 import asyncio
 import os
 from enum import Enum
-from typing import assert_never
 
 from dotenv import load_dotenv
 from loguru import logger
@@ -14,21 +13,10 @@ from transformers import AutoTokenizer
 
 
 class ModelName(Enum):
-    QWEN2_5_7B = "qwen2.5-7b"
-    QWEN2_5_32B = "qwen2.5-32b"
-    QWEN2_5_72B = "qwen2.5-72b"
-    LLAMA3_3_70B = "llama3.3-70b"
-    QWQ_32B = "qwq-32b"
-    DEEPSEEK_R1 = "deepseek-r1-250120"
-    DEEPSEEK_R1_DISTILL_QWEN2_5_MATH_7B = "dsr1-distill-qwen2.5-math-7b"
     QWEN3_8B_THINK = "qwen3-8b-think"
     QWEN3_8B_NO_THINK = "qwen3-8b-no_think"
     QWEN3_32B_THINK = "qwen3-32b-think"
     QWEN3_32B_NO_THINK = "qwen3-32b-no_think"
-    LLAMA3_1_8B = "llama3.1-8b"
-    DEEPSEEK_R1_DISTILL_LLAMA3_1_8B = "dsr1-distill-llama3.1-8b"
-    PHI4_MINI_REASONING = "phi4-mini-reasoning"
-    PHI4_MINI_INSTRUCT = "phi4-mini-instruct"
 
     def __str__(self) -> str:
         return self.value
@@ -36,37 +24,6 @@ class ModelName(Enum):
     @property
     def model_id(self) -> str:
         return self.value
-
-    @property
-    def hf_name(self) -> str:
-        if self == ModelName.QWEN2_5_7B:
-            return "Qwen/Qwen2.5-7B-Instruct"
-        if self == ModelName.QWEN2_5_32B:
-            return "Qwen/Qwen2.5-32B-Instruct"
-        elif self == ModelName.QWEN2_5_72B:
-            return "Qwen/Qwen2.5-72B-Instruct"
-        elif self == ModelName.LLAMA3_3_70B:
-            return "meta-llama/Llama-3.3-70B-Instruct"
-        elif self == ModelName.QWQ_32B:
-            return "Qwen/QwQ-32B"
-        elif self == ModelName.DEEPSEEK_R1:
-            return "deepseek-ai/DeepSeek-R1"
-        elif self == ModelName.DEEPSEEK_R1_DISTILL_QWEN2_5_MATH_7B:
-            return "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B"
-        elif self in [ModelName.QWEN3_8B_THINK, ModelName.QWEN3_8B_NO_THINK]:
-            return "Qwen/Qwen3-8B"
-        elif self in [ModelName.QWEN3_32B_THINK, ModelName.QWEN3_32B_NO_THINK]:
-            return "Qwen/Qwen3-32B"
-        elif self == ModelName.LLAMA3_1_8B:
-            return "meta-llama/Llama-3.1-8B-Instruct"
-        elif self == ModelName.DEEPSEEK_R1_DISTILL_LLAMA3_1_8B:
-            return "deepseek-ai/DeepSeek-R1-Distill-Llama-8B"
-        elif self == ModelName.PHI4_MINI_REASONING:
-            return "microsoft/Phi-4-mini-reasoning"
-        elif self == ModelName.PHI4_MINI_INSTRUCT:
-            return "microsoft/Phi-4-mini-instruct"
-        else:
-            assert_never(self)
 
 
 class ChatAPIResponse(BaseModel):
@@ -80,10 +37,10 @@ class CompleteAPIResponse(BaseModel):
 
 
 class Model:
-    def __init__(self, model_name: ModelName):
+    def __init__(self, model_name: ModelName, model_name_or_path: str):
         self.model_name = model_name
         self._client = self._get_client()
-        self._tokenizer = AutoTokenizer.from_pretrained(self.model_name.hf_name)
+        self._tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
 
     @staticmethod
     def _get_client() -> AsyncOpenAI:
