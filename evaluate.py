@@ -48,17 +48,18 @@ class Argument(Tap):
 async def evaluate(judge_model: Model, record: dict) -> Result[tuple[int, int, dict], str]:
     judge_prompt = (
         "You are now a large language model referee. "
-        "I will provide you with a question and the answer from another model, "
-        "and you need to determine whether the model's answer is correct.\n\n"
-        "Question:\n"
+        "I will provide you with a multi-solution question and the answers from another model."
+        "The model's answers may be wrong, incomplete, or all correct."
+        "You need to judge model's answers one by one.\n\n"
+        "Multi-solution question:\n"
         f"{record['question']}\n"
-        "Answer:\n"
+        "Model answers:\n"
         f"{record['model_answer_extracted']}\n\n"
         "Please tell me how many solutions the model obtained for this question. "
         "According to the constraints in the question, is each solution of the model correct? "
         "Please verify each solution using the constraints one by one, and output [[x/y]], "
         "where x is the number of correct solutions output by the model "
-        "and y is the number of solutions output by the model. "
+        "and y is the total number of solutions output by the model. "
         "Besides, x or y can be 0 if no solution is output by the model."
     )
     if judge_model.model_name in [ModelName.QWEN3_8B_THINK, ModelName.QWEN3_32B_THINK]:
@@ -72,7 +73,7 @@ async def evaluate(judge_model: Model, record: dict) -> Result[tuple[int, int, d
         return judge_response_result
 
     _, judge_response = split_thinking_answer(judge_response_result.ok_value.message_content)
-    matches = [(int(x), int(y)) for x, y in re.findall(r"[{\[]\[(\d+)/(\d+)][]}]", judge_response)]
+    matches = [(int(x), int(y)) for x, y in re.findall(r"[{\[]\[?(\d+)/(\d+)]?[]}]", judge_response)]
     if len(matches) < 1:
         return Err(f"No solution count found in judge model response: {judge_response}")
     correct_count, total_count = matches[0][0], matches[0][1]
