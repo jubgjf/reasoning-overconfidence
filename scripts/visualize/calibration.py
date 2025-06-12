@@ -1,14 +1,15 @@
 import matplotlib.pyplot as plt
 import pandas as pd
-import seaborn as sns
 from pydantic import BaseModel
 from tortoise import run_async
 
+import numpy as np
 from confidence.dataset import DatasetName
 from confidence.logger import Logger
 from confidence.method import MethodName
 from confidence.model import ModelName
 from confidence.template import Template, SubsetSumTemplate, TimeTablingTemplate
+from scripts.visualize.metrics import prf
 
 
 class Setting(BaseModel):
@@ -18,25 +19,24 @@ class Setting(BaseModel):
 
 async def main():
     judge_model = ModelName.QWEN3_32B_NO_THINK
-    dataset = DatasetName.SubsetSum
-    # dataset = DatasetName.TimeTabling
+    # dataset = DatasetName.SubsetSum
+    dataset = DatasetName.TimeTabling
     method = MethodName.Verbal_0_100
     no_cot_memory = False
+    turn = 0
 
     settings = [
-        # Setting(model=ModelName.QWEN3_8B_THINK, template=TimeTablingTemplate.simple),
-        # Setting(model=ModelName.QWEN3_8B_NO_THINK, template=TimeTablingTemplate.simple),
-        # Setting(model=ModelName.QWEN3_8B_NO_THINK, template=TimeTablingTemplate.cot),
-        Setting(model=ModelName.QWEN3_8B_THINK, template=SubsetSumTemplate.simple),
-        Setting(model=ModelName.QWEN3_8B_NO_THINK, template=SubsetSumTemplate.simple),
-        Setting(model=ModelName.QWEN3_8B_NO_THINK, template=SubsetSumTemplate.cot),
+        Setting(model=ModelName.QWEN3_8B_THINK, template=TimeTablingTemplate.simple),
+        Setting(model=ModelName.QWEN3_8B_NO_THINK, template=TimeTablingTemplate.cot),
+        # Setting(model=ModelName.QWEN3_8B_THINK, template=SubsetSumTemplate.simple),
+        # Setting(model=ModelName.QWEN3_8B_NO_THINK, template=SubsetSumTemplate.cot),
     ]
 
     records_list = []
     for setting in settings:
         record_cls = dataset.record_cls
         db_logger = Logger(
-            db_name=dataset.value,
+            db_name=dataset.value + f"--turn{turn}",
             table_name=f"{dataset}--{method}--no-cot-memory-{no_cot_memory}--{setting.template}--{setting.model}--evaluate-by-{judge_model}",
             record_cls=record_cls,
         )
@@ -45,8 +45,6 @@ async def main():
 
         method_records = [record.model_dump() for record in records]
         df = pd.DataFrame(method_records)
-        if method == MethodName.Verbal_0_100:
-            df["model_confidence_extracted"] = df["model_confidence_extracted"].apply(lambda x: x / 100)
         if isinstance(setting.template, SubsetSumTemplate):
             df["setting"] = f"{setting.model}--{setting.template.value.replace('-subsetsum', '')}"
         else:
@@ -55,56 +53,77 @@ async def main():
         records_list.append(df)
 
     df = pd.concat(records_list, ignore_index=True)
-
-    df["correct_solution_count"] = df["eval_result"].apply(lambda x: int(x.split("/")[0]))
-    df["total_solution_count"] = df["eval_result"].apply(lambda x: int(x.split("/")[1]))
-
-    df = df[df["correct_solution_count"] <= df["total_solution_count"]]
-    df = df[df["correct_solution_count"] <= df["answer_count"]]
-    df = df[df["total_solution_count"] <= df["answer_count"]]
-
-    if dataset == DatasetName.TimeTabling:
-        df["answer_count_bin"] = df["answer_count"].apply(lambda x: int(x // 50))
-    elif dataset == DatasetName.SubsetSum:
-        df["answer_count_bin"] = df["answer_count"].apply(lambda x: int(x // 50) if int(x // 50) < 6 else 6)
-    else:
-        raise NotImplementedError
-
-    df["recall"] = df["correct_solution_count"] / df["answer_count"]
-    df["precision"] = df["correct_solution_count"] / df["total_solution_count"]
+    df = prf(df, method, dataset)
 
     df.loc[df["setting"] == "qwen3-8b-no_think--cot", "setting"] = "Short-CoT"
-    df.loc[df["setting"] == "qwen3-8b-no_think--simple", "setting"] = "no-CoT"
+    # df.loc[df["setting"] == "qwen3-8b-no_think--simple", "setting"] = "no-CoT"
     df.loc[df["setting"] == "qwen3-8b-think--simple", "setting"] = "Long-CoT"
+
+    ece_dict = {}
+    for setting, group in df.groupby("setting"):
+        bins = np.linspace(0, 1, 11)
+        group["bin"] = pd.cut(group["model_confidence_extracted"], bins=bins, include_lowest=True, labels=False)
+        ece = 0
+        N = len(group)
+        for b in range(10):
+            bin_data = group[group["bin"] == b]
+            if len(bin_data) == 0:
+                continue
+            acc = (bin_data["recall"] == 1).mean()  # 或用 precision
+            conf = bin_data["model_confidence_extracted"].mean()
+            ece += len(bin_data) / N * abs(acc - conf)
+        ece_dict[setting] = ece
+    df["setting"] = df["setting"].apply(lambda s: f"{s} (ECE={ece_dict[s]:.3f})")
 
     df["confidence_bin"] = pd.cut(df["model_confidence_extracted"], bins=10, include_lowest=True, labels=False)
     grouped = (
         df.groupby(["setting", "confidence_bin"])
         .agg(
             mean_confidence=("model_confidence_extracted", "mean"),
-            mean_precision=("precision", "mean"),
+            mean_accuracy=("recall", "mean"),  # precision or recall
             count=("confidence_bin", "size"),
         )
         .reset_index()
     )
 
-    plt.figure(figsize=(5, 5))
-    sns.lineplot(
-        x="mean_confidence",
-        y="mean_precision",
-        hue="setting",
-        data=grouped,
-        marker="o",
-    )
-    plt.plot([0, 1], [0, 1], linestyle="--", color="gray", label="Perfectly Calibrated")
-    plt.xlabel("Confidence")
-    plt.ylabel("Precision")
-    plt.xlim(0, 1)
-    plt.ylim(0, 1)
-    plt.legend(title="setting")
-    plt.grid(True)
-    plt.title("SubsetSum")
-    # plt.title("TimeTabling")
+    fig, axes = plt.subplots(1, 2, figsize=(8, 5), sharey=True)
+    bin_edges = np.linspace(0, 1, 11)
+    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+
+    color_map = {"Long-CoT": "tab:blue", "Short-CoT": "tab:orange"}
+    for ax, (setting, group) in zip(axes, grouped.groupby("setting")):
+        # 提取原始名称用于配色
+        if "Long-CoT" in setting:
+            color = color_map["Long-CoT"]
+        else:
+            color = color_map["Short-CoT"]
+        mean_accuracys = np.full(10, np.nan)
+        for i in range(10):
+            bin_group = group[group["confidence_bin"] == i]
+            if not bin_group.empty:
+                mean_accuracys[i] = bin_group["mean_accuracy"].values[0]
+        ax.bar(
+            bin_centers,
+            mean_accuracys,
+            width=0.07,
+            alpha=0.6,
+            label=setting,
+            align="center",
+            edgecolor="black",
+            color=color,
+        )
+        valid = ~np.isnan(mean_accuracys)
+        ax.plot(bin_centers[valid], mean_accuracys[valid], marker="o", linestyle="-", linewidth=2, color=color)
+        ax.plot([0, 1], [0, 1], linestyle="--", color="gray", label="Perfectly Calibrated")
+        ax.set_xlabel("Confidence")
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
+        ax.set_title(setting)
+        ax.grid(True)
+        ax.legend()
+    axes[0].set_ylabel("Recall")
+    plt.suptitle("TimeTabling Calibration")
+    plt.tight_layout(rect=[0, 0, 1, 0.96])
     plt.show()
 
 

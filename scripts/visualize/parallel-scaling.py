@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 from pydantic import BaseModel
 from tortoise import run_async
 
@@ -16,13 +17,14 @@ class Setting(BaseModel):
 
 async def main():
     judge_model = ModelName.QWEN3_32B_NO_THINK
-    dataset = DatasetName.TimeTabling
+    dataset = DatasetName.SubsetSum
+    # dataset = DatasetName.TimeTabling
     method = MethodName.Verbal_0_100
     no_cot_memory = False
 
     settings = [
-        # Setting(model=ModelName.QWEN3_8B_THINK, template=SubsetSumTemplate.simple),
-        Setting(model=ModelName.QWEN3_8B_THINK, template=TimeTablingTemplate.simple),
+        Setting(model=ModelName.QWEN3_8B_THINK, template=SubsetSumTemplate.simple),
+        # Setting(model=ModelName.QWEN3_8B_THINK, template=TimeTablingTemplate.simple),
     ]
 
     records_list = []
@@ -64,14 +66,28 @@ async def main():
     else:
         raise NotImplementedError
 
-    df["completeness"] = df["correct_solution_count"] / df["answer_count"]
-    df["accuracy"] = df["correct_solution_count"] / df["total_solution_count"]
+    df["recall"] = df["correct_solution_count"] / df["answer_count"]
+    df["precision"] = df["correct_solution_count"] / df["total_solution_count"]
 
     # 对于每个question_id，可能存在多个turn的结果，只保留len(model_thinking_response)最大的行(设置consistency_choose为True)
-    df["max_model_thinking_response"] = df.groupby(["question_id", "answer_count_bin"])[
-        "model_thinking_response"
+    # df["max_model_thinking_response"] = df.groupby(["question_id", "answer_count_bin"])[
+    #     "model_thinking_response"
+    # ].transform(lambda x: x.max())
+    # df["consistency_choose"] = df["model_thinking_response"] == df["max_model_thinking_response"]
+    df["max_model_confidence"] = df.groupby(["question_id", "answer_count_bin"])[
+        "model_confidence_extracted"
     ].transform(lambda x: x.max())
-    df["consistency_choose"] = df["model_thinking_response"] == df["max_model_thinking_response"]
+    df["consistency_choose"] = df["model_confidence_extracted"] == df["max_model_confidence"]
+    # df["min_model_confidence"] = df.groupby(["question_id", "answer_count_bin"])[
+    #     "model_confidence_extracted"
+    # ].transform(lambda x: x.min())
+    # df["consistency_choose"] = df["model_confidence_extracted"] == df["min_model_confidence"]
+    # df["median_model_confidence"] = df.groupby(["question_id", "answer_count_bin"])[
+    #     "model_confidence_extracted"
+    # ].transform("median")
+    # df["confidence_diff"] = (df["model_confidence_extracted"] - df["median_model_confidence"]).abs()
+    # df["min_confidence_diff"] = df.groupby(["question_id", "answer_count_bin"])["confidence_diff"].transform("min")
+    # df["consistency_choose"] = df["confidence_diff"] == df["min_confidence_diff"]
 
     df["scaling"] = df["consistency_choose"].apply(lambda x: "parallel" if x else "none")
     df = df[~((df["scaling"] == "none") & (df["turn"] != 0))]
@@ -87,38 +103,38 @@ async def main():
     else:
         raise NotImplementedError
 
-    parallel_completeness_mean = df[df["scaling"] == "parallel"]["completeness"].mean()
-    none_completeness_mean = df[df["scaling"] == "none"]["completeness"].mean()
-    print(f"Parallel Completeness: {parallel_completeness_mean * 100:.2f}")
-    print(f"None Completeness: {none_completeness_mean * 100:.2f}")
-    # plt.figure()
-    # sns.lineplot(data=df, x="answer_count_bin", y="completeness", hue="scaling")
-    # plt.xlabel("Answer Count Bin")
-    # plt.ylabel("completeness")
-    # plt.title("completeness")
-    # plt.show()
+    parallel_recall_mean = df[df["scaling"] == "parallel"]["recall"].mean()
+    none_recall_mean = df[df["scaling"] == "none"]["recall"].mean()
+    print(f"Parallel Recall: {parallel_recall_mean * 100:.2f}")
+    print(f"None Recall: {none_recall_mean * 100:.2f}")
 
-    parallel_accuracy_mean = df[df["scaling"] == "parallel"]["accuracy"].mean()
-    none_accuracy_mean = df[df["scaling"] == "none"]["accuracy"].mean()
-    print(f"Parallel Accuracy: {parallel_accuracy_mean * 100:.2f}")
-    print(f"None Accuracy: {none_accuracy_mean * 100:.2f}")
-    # plt.figure()
-    # sns.lineplot(data=df, x="answer_count_bin", y="accuracy", hue="scaling")
-    # plt.xlabel("Answer Count Bin")
-    # plt.ylabel("accuracy")
-    # plt.title("accuracy")
-    # plt.show()
+    parallel_precision_mean = df[df["scaling"] == "parallel"]["precision"].mean()
+    none_precision_mean = df[df["scaling"] == "none"]["precision"].mean()
+    print(f"Parallel Precision: {parallel_precision_mean * 100:.2f}")
+    print(f"None Precision: {none_precision_mean * 100:.2f}")
 
     parallel_confidence_mean = df[df["scaling"] == "parallel"]["model_confidence_extracted"].mean()
     none_confidence_mean = df[df["scaling"] == "none"]["model_confidence_extracted"].mean()
     print(f"Parallel Confidence: {parallel_confidence_mean}")
     print(f"None Confidence: {none_confidence_mean}")
-    # plt.figure()
-    # sns.scatterplot(df, x="model_confidence_extracted", y="completeness", hue="scaling")
-    # plt.xlabel("conf")
-    # plt.ylabel("comp")
-    # plt.title("accuracy")
-    # plt.show()
+
+    ece_dict = {}
+    for scaling, group in df.groupby("scaling"):
+        bins = np.linspace(0, 1, 11)
+        group["bin"] = pd.cut(group["model_confidence_extracted"], bins=bins, include_lowest=True, labels=False)
+        ece = 0
+        N = len(group)
+        for b in range(10):
+            bin_data = group[group["bin"] == b]
+            if len(bin_data) == 0:
+                continue
+            acc = (bin_data["recall"] == 1).mean()  # 或用 precision
+            conf = bin_data["model_confidence_extracted"].mean()
+            ece += len(bin_data) / N * abs(acc - conf)
+        ece_dict[scaling] = ece
+
+    print(f"Parallel ECE: {ece_dict.get('parallel', float('nan')) * 100:.2f}")
+    print(f"None ECE: {ece_dict.get('none', float('nan')) * 100:.2f}")
 
 
 if __name__ == "__main__":

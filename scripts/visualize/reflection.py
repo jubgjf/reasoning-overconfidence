@@ -8,7 +8,7 @@ from confidence.dataset import DatasetName
 from confidence.logger import Logger
 from confidence.method import MethodName
 from confidence.model import ModelName
-from confidence.template import SubsetSumTemplate, TimeTablingTemplate
+from confidence.template import SubsetSumTemplate
 
 
 def count_reflections(history_thinking_content: str) -> int:
@@ -52,10 +52,11 @@ async def main():
     # dataset = DatasetName.TimeTabling
     method = MethodName.Verbal_0_100
     no_cot_memory = False
+    turn = 0
 
     record_cls = dataset.record_cls
     db_logger = Logger(
-        db_name=dataset.value,
+        db_name=dataset.value + f"--turn{turn}",
         table_name=f"{dataset}--{method}--no-cot-memory-{no_cot_memory}--{template}--{model}--evaluate-by-{judge_model}",
         record_cls=record_cls,
     )
