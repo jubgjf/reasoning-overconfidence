@@ -1,14 +1,13 @@
-import itertools
 import math
 import re
 from functools import partial
-from typing import Callable, assert_never
+from typing import Callable
 
 from result import Err, Ok, Result
 
 from .dataset import DatasetName
 from .method import ChatResponsePerTurn, CompleteResponsePerTurn, MethodName
-from .utils import first_option_postprocess, gaokao_postprocess, gsm8k_postprocess, split_thinking_answer
+from .utils import split_thinking_answer
 
 
 def extract_answer_and_verbal_confidence(
@@ -25,66 +24,6 @@ def extract_answer_and_verbal_confidence(
     if len(confidence_score_matches) < 1:
         return Err(f"No confidence score found in confidence response: {confidence_turn.answer_content}")
     return Ok((extracted_answer, float(confidence_score_matches[0])))
-
-
-def extract_answer_and_logprob_confidence(
-    dataset_name: DatasetName,
-    question_turn: ChatResponsePerTurn | CompleteResponsePerTurn,
-    postprocessor: Callable[[str], Result[tuple[str, int, int], str]],
-) -> Result[tuple[str, float], str]:
-    if isinstance(question_turn, ChatResponsePerTurn):
-        extracted_result = postprocessor(question_turn.answer_content)
-        if extracted_result.is_err():
-            return extracted_result
-        extracted_answer, answer_char_index, answer_char_len = extracted_result.ok_value
-        token_index, char_index = 0, 0
-        for tok in question_turn.answer_logprobs:
-            token_index += 1
-            char_index += len(tok.token)
-            if char_index >= answer_char_index:
-                break
-        else:
-            return Err(f"Answer token not found in {question_turn.answer_content}")
-        if char_index == answer_char_index:
-            # Token is "A" or "B" etc.
-            answer_tokens = question_turn.answer_logprobs[token_index : token_index + answer_char_len]
-            candidate_answer_tokens = question_turn.answer_logprobs[token_index + 1 : token_index + answer_char_len + 1]
-        else:
-            # Token is " A" or " B" etc.
-            answer_tokens = question_turn.answer_logprobs[token_index - 1 : token_index - 1 + answer_char_len]
-            candidate_answer_tokens = question_turn.answer_logprobs[token_index : token_index + answer_char_len]
-        if "".join([t.token.strip() for t in answer_tokens]) != extracted_answer:
-            if "".join([t.token.strip() for t in candidate_answer_tokens]) != extracted_answer:
-                # Sometimes "�" in "".join(tokens), so char_index may be wrong, and tokens may not match answer exactly
-                return Err(
-                    f"Answer token mismatch: {''.join([t.token.strip() for t in answer_tokens])} != {extracted_answer}"
-                )
-            answer_tokens = candidate_answer_tokens
-        top_logprobs = [t.top_logprobs for t in answer_tokens]
-        all_number_pairs = list(itertools.product(*top_logprobs))
-        logprobs_unnormalized_unfiltered = {
-            "".join([p.token.strip() for p in pair]): sum([p.logprob for p in pair]) for pair in all_number_pairs
-        }
-        if dataset_name in [DatasetName.GSM8K]:
-            logprobs_unnormalized = dict(
-                filter(
-                    lambda item: item[0].lstrip("-").replace(".", "", 1).isdigit(),
-                    logprobs_unnormalized_unfiltered.items(),
-                )
-            )
-        elif dataset_name in [DatasetName.ARC, DatasetName.LogiQA]:
-            logprobs_unnormalized = dict(
-                filter(lambda item: item[0] in "ABCD", logprobs_unnormalized_unfiltered.items())
-            )
-        else:
-            raise NotImplementedError
-        logprobs_unnormalized = {k: math.exp(v) for k, v in logprobs_unnormalized.items()}
-        logprobs_normalized = {k: v / sum(logprobs_unnormalized.values()) for k, v in logprobs_unnormalized.items()}
-        return Ok((extracted_answer, logprobs_normalized[extracted_answer]))
-    elif isinstance(question_turn, CompleteResponsePerTurn):
-        raise NotImplementedError
-    else:
-        assert_never(question_turn)
 
 
 def extract_answer_and_p_true_confidence(
@@ -133,10 +72,6 @@ def extract_answer_and_confidence(
         assert method_name == MethodName.Verbal_0_100
 
     postprocess_map = {
-        DatasetName.GSM8K: gsm8k_postprocess,
-        DatasetName.ARC: first_option_postprocess,
-        DatasetName.LogiQA: first_option_postprocess,
-        DatasetName.GAOKAO_Physics: gaokao_postprocess,
         DatasetName.TimeTabling: lambda x: Ok((split_thinking_answer(x)[-1], -1, -1)),
         DatasetName.SubsetSum: lambda x: Ok((split_thinking_answer(x)[-1], -1, -1)),
     }
@@ -144,7 +79,6 @@ def extract_answer_and_confidence(
 
     extractor_map = {
         MethodName.Verbal_0_100: partial(extract_answer_and_verbal_confidence, confidence_turn=confidence_turn),
-        MethodName.LogProb: partial(extract_answer_and_logprob_confidence, dataset_name=dataset_name),
         MethodName.P_True: partial(extract_answer_and_p_true_confidence, confidence_turn=confidence_turn),
     }
     extractor = extractor_map[method_name]

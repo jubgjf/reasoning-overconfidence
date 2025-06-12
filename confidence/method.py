@@ -17,7 +17,6 @@ from .utils import split_thinking_answer, split_thinking_answer_logprobs
 
 class MethodName(Enum):
     Verbal_0_100 = "verbal_0_100"
-    LogProb = "logprob"
     P_True = "p_true"
 
     def __str__(self) -> str:
@@ -29,7 +28,7 @@ class MethodName(Enum):
 
     @property
     def need_logprobs(self) -> bool:
-        return self in [self.LogProb, self.P_True]
+        return self in [self.P_True]
 
     @property
     def prompt(self) -> str | None:
@@ -37,8 +36,6 @@ class MethodName(Enum):
             return "Please rate your confidence in the proposed answer on a scale of 0-100. Give your confidence in format: [[xx]]"
         elif self == self.P_True:
             return "Please rate your confidence in the proposed answer as either 0 or 1. Give your confidence in format: [[x]]"
-        elif self == self.LogProb:
-            return None
         else:
             assert_never(self)
 

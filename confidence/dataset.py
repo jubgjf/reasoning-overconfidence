@@ -7,15 +7,11 @@ from typing import Type
 from pydantic import BaseModel
 from typing_extensions import TypeVar
 
-from .data import Data, GSM8KData, ARCData, LogiQAData, GAOKAOData, TimeTablingData, SubsetSumData
-from .logger import GSM8KRecord, ARCRecord, LogiQARecord, GAOKAORecord, Record, TimeTablingRecord, SubsetSumRecord
+from .data import Data, TimeTablingData, SubsetSumData
+from .logger import Record, TimeTablingRecord, SubsetSumRecord
 
 
 class DatasetName(Enum):
-    GSM8K = "gsm8k"
-    ARC = "arc"
-    LogiQA = "logiqa"
-    GAOKAO_Physics = "gaokao_physics"
     TimeTabling = "timetabling"
     SubsetSum = "subsetsum"
 
@@ -25,10 +21,6 @@ class DatasetName(Enum):
     @property
     def record_cls(self) -> Type[Record]:
         record_cls_map = {
-            DatasetName.GSM8K: GSM8KRecord,
-            DatasetName.ARC: ARCRecord,
-            DatasetName.LogiQA: LogiQARecord,
-            DatasetName.GAOKAO_Physics: GAOKAORecord,
             DatasetName.TimeTabling: TimeTablingRecord,
             DatasetName.SubsetSum: SubsetSumRecord,
         }
@@ -37,10 +29,6 @@ class DatasetName(Enum):
     @property
     def dataset_cls(self) -> Type["Dataset"]:
         dataset_cls_map = {
-            DatasetName.GSM8K: GSM8KDataset,
-            DatasetName.ARC: ARCDataset,
-            DatasetName.LogiQA: LogiQADataset,
-            DatasetName.GAOKAO_Physics: GAOKAODataset,
             DatasetName.TimeTabling: TimeTablingDataset,
             DatasetName.SubsetSum: SubsetSumDataset,
         }
@@ -80,46 +68,6 @@ class IDataset(BaseModel, ABC):
         return [data for data in dataset if data.question_id in already_processed_ids]
 
 
-class GSM8KDataset(IDataset):
-    @property
-    def _name(self) -> DatasetName:
-        return DatasetName.GSM8K
-
-    @property
-    def _data_cls(self) -> Type[Data]:
-        return GSM8KData
-
-
-class ARCDataset(IDataset):
-    @property
-    def _name(self) -> DatasetName:
-        return DatasetName.ARC
-
-    @property
-    def _data_cls(self) -> Type[Data]:
-        return ARCData
-
-
-class LogiQADataset(IDataset):
-    @property
-    def _name(self) -> DatasetName:
-        return DatasetName.LogiQA
-
-    @property
-    def _data_cls(self) -> Type[Data]:
-        return LogiQAData
-
-
-class GAOKAODataset(IDataset):
-    @property
-    def _name(self) -> DatasetName:
-        return DatasetName.GAOKAO_Physics
-
-    @property
-    def _data_cls(self) -> Type[Data]:
-        return GAOKAOData
-
-
 class TimeTablingDataset(IDataset):
     @property
     def _name(self) -> DatasetName:
@@ -140,12 +88,4 @@ class SubsetSumDataset(IDataset):
         return SubsetSumData
 
 
-Dataset = TypeVar(
-    "Dataset",
-    GSM8KDataset,
-    ARCDataset,
-    LogiQADataset,
-    GAOKAODataset,
-    TimeTablingDataset,
-    SubsetSumDataset,
-)
+Dataset = TypeVar("Dataset", TimeTablingDataset, SubsetSumDataset)
