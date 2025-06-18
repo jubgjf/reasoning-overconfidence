@@ -20,7 +20,7 @@ def extract_answer_and_verbal_confidence(
         return extracted_result
     extracted_answer, _, _ = extracted_result.ok_value
 
-    confidence_score_matches = re.findall(r"\[\[(100|[1-9]?[0-9])]]", confidence_turn.answer_content)
+    confidence_score_matches = re.findall(r"\\boxed{(100|[1-9]?[0-9])}", confidence_turn.answer_content)
     if len(confidence_score_matches) < 1:
         return Err(f"No confidence score found in confidence response: {confidence_turn.answer_content}")
     return Ok((extracted_answer, float(confidence_score_matches[0])))
@@ -36,7 +36,7 @@ def extract_answer_and_p_true_confidence(
         return extracted_result
     extracted_answer, _, _ = extracted_result.ok_value
 
-    confidence_score_matches = re.findall(r"\[\[([01])]]", confidence_turn.answer_content)
+    confidence_score_matches = re.findall(r"\boxed{([01])}", confidence_turn.answer_content)
     if len(confidence_score_matches) < 1:
         return Err(f"No confidence score found in confidence response: {confidence_turn.answer_content}")
     found_left_quote, found_number, found_right_quote, number_token_index = False, False, False, None

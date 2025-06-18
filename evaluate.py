@@ -57,7 +57,7 @@ async def evaluate(judge_model: Model, record: dict) -> Result[tuple[int, int, d
         f"{record['model_answer_extracted']}\n\n"
         "Please tell me how many solutions the model obtained for this question. "
         "According to the constraints in the question, is each solution of the model correct? "
-        "Please verify each solution using the constraints one by one, and output [[x/y]], "
+        "Please verify each solution using the constraints one by one, and output in format: \\boxed{x/y}, "
         "where x is the number of correct solutions output by the model "
         "and y is the total number of solutions output by the model. "
         "Besides, x or y can be 0 if no solution is output by the model."
@@ -73,7 +73,7 @@ async def evaluate(judge_model: Model, record: dict) -> Result[tuple[int, int, d
         return judge_response_result
 
     _, judge_response = split_thinking_answer(judge_response_result.ok_value.message_content)
-    matches = [(int(x), int(y)) for x, y in re.findall(r"[{\[]\[?(\d+)/(\d+)]?[]}]", judge_response)]
+    matches = [(int(x), int(y)) for x, y in re.findall(r"\\boxed{(\d+)/(\d+)}", judge_response)]
     if len(matches) < 1:
         return Err(f"No solution count found in judge model response: {judge_response}")
     correct_count, total_count = matches[0][0], matches[0][1]

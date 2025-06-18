@@ -33,9 +33,9 @@ class MethodName(Enum):
     @property
     def prompt(self) -> str | None:
         if self == self.Verbal_0_100:
-            return "Please rate your confidence in the proposed answer on a scale of 0-100. Give your confidence in format: [[xx]]"
+            return "Please rate your confidence in the proposed answer on a scale of 0-100. Put your confidence score within \\boxed{}"
         elif self == self.P_True:
-            return "Please rate your confidence in the proposed answer as either 0 or 1. Give your confidence in format: [[x]]"
+            return "Please rate your confidence in the proposed answer as either 0 or 1. Put your confidence score within \\boxed{}"
         else:
             assert_never(self)
 
