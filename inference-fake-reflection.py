@@ -34,10 +34,10 @@ class Argument(Tap):
     method: MethodName = MethodName.Verbal_0_100
     temperature: float = 0.2
     fake_type: FakeType = FakeType.less
-    no_cot_memory: bool = False
+    no_cot_memory: bool = True
     force_update: bool = False
     concurrency: int = 5
-    turn: int | None = None
+    turn: int = 0
     debug: bool = False
 
     def configure(self) -> None:
@@ -50,10 +50,8 @@ async def main(args: Argument):
     # ===== full-reflection chat history =====
     if args.debug:
         db_name = "debug"
-    elif args.turn is None:
-        db_name = args.dataset.value
     else:
-        db_name = f"{args.dataset.value}--turn{args.turn}"
+        db_name = f"{args.dataset.value}--{args.model}--{args.template}--turn{args.turn}"
     load_title = f"{args.dataset}--{args.method}--no-cot-memory-{args.no_cot_memory}--{args.template}--{args.model}--{args.temperature}"
     db_logger = Logger(db_name=db_name, table_name=load_title, record_cls=record_cls)
     async with db_logger:
