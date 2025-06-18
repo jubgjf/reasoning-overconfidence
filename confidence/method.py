@@ -239,10 +239,13 @@ class Method:
         data: Data,
         template: Template,
         history_thinking_content: str,
+        history_answer_content: str,
         temperature: float = 0,
         max_tokens: int = 16384,
         no_cot_memory: bool = False,
     ) -> list[Coroutine[Any, Any, Result[tuple[Data, Response], str]]]:
+        assert model.model_name in [ModelName.QWEN3_8B_THINK, ModelName.QWEN3_32B_THINK], "Only support Long-CoT model"
+
         reflection_patterns = [
             r"^Wait,.*\n\n",
             r"^Let me double-check.*\n\n",
@@ -270,12 +273,7 @@ class Method:
         for i in range(0, len(thinking_steps_by_reflection), 2):
             thinking_with_reduced_reflection.append(thinking_steps_by_reflection[: i + 1])
 
-        if model.model_name in [ModelName.QWEN3_8B_THINK, ModelName.QWEN3_32B_THINK]:
-            user_input = model.apply_chat_template([{"role": "user", "content": template.prompt(data) + " /think"}])
-        elif model.model_name in [ModelName.QWEN3_8B_NO_THINK, ModelName.QWEN3_32B_NO_THINK]:
-            user_input = model.apply_chat_template([{"role": "user", "content": template.prompt(data) + " /no_think"}])
-        else:
-            user_input = model.apply_chat_template([{"role": "user", "content": template.prompt(data)}])
+        user_input = model.apply_chat_template([{"role": "user", "content": template.prompt(data) + " /think"}])
         user_input_with_thinking = [user_input + "".join(steps) for steps in thinking_with_reduced_reflection]
         user_input_with_thinking = [
             im if im.endswith("</think>") else im + "</think>" for im in user_input_with_thinking
@@ -300,29 +298,28 @@ class Method:
         data: Data,
         template: Template,
         history_thinking_content: str,
+        history_answer_content: str,
         temperature: float = 0,
         max_tokens: int = 16384,
         no_cot_memory: bool = False,
     ) -> list[Coroutine[Any, Any, Result[tuple[Data, Response], str]]]:
-        if not history_thinking_content.endswith("</think>"):
-            logger.warning("History thinking content does not end with </think>, skip")
+        assert model.model_name not in [ModelName.QWEN3_8B_THINK, ModelName.QWEN3_32B_THINK], (
+            "Not support Long-CoT model"
+        )
 
-        # Insert a random reflection pattern before </think>
+        # Insert a random reflection pattern after Short-CoT
         reflection_patterns = [
             "Wait, there may be other solutions.",
             "Let me double-check if there is any other solution.",
             "Let me think again if there is any other solution.",
         ]
-        history_thinking_content = history_thinking_content[: -len("</think>")]
-        history_thinking_content += "\n" + random.choice(reflection_patterns)
+        history_answer_content += "\n\n" + random.choice(reflection_patterns)
 
-        if model.model_name in [ModelName.QWEN3_8B_THINK, ModelName.QWEN3_32B_THINK]:
-            user_input = model.apply_chat_template([{"role": "user", "content": template.prompt(data) + " /think"}])
-        elif model.model_name in [ModelName.QWEN3_8B_NO_THINK, ModelName.QWEN3_32B_NO_THINK]:
+        if model.model_name in [ModelName.QWEN3_8B_NO_THINK, ModelName.QWEN3_32B_NO_THINK]:
             user_input = model.apply_chat_template([{"role": "user", "content": template.prompt(data) + " /no_think"}])
         else:
             user_input = model.apply_chat_template([{"role": "user", "content": template.prompt(data)}])
-        user_input_with_thinking = user_input + history_thinking_content
+        user_input_with_thinking = user_input + history_answer_content
         return [
             self._request_fake_reflection(
                 model=model,

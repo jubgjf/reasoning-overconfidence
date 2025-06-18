@@ -91,6 +91,7 @@ async def main(args: Argument):
                 template=args.template,
                 temperature=args.temperature,
                 history_thinking_content=split_thinking_answer(turn["assistant_0"])[0],
+                history_answer_content=split_thinking_answer(turn["assistant_0"])[1],
                 max_tokens=16384,
                 no_cot_memory=args.no_cot_memory,
             )
