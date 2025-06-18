@@ -45,7 +45,7 @@ async def request(
     no_cot_memory: bool = True,
 ) -> tuple[Data, Result[Response, str]]:
     response_result = await method.request(
-        model, data, template, temperature=temperature, max_tokens=32768, no_cot_memory=no_cot_memory
+        model, data, template, temperature=temperature, max_tokens=100000, no_cot_memory=no_cot_memory
     )
     return data, response_result
 
@@ -140,6 +140,7 @@ async def main(args: Argument):
 if __name__ == "__main__":
     args = Argument().parse_args()
 
+    os.environ["SGLANG_ALLOW_OVERWRITE_LONGER_CONTEXT_LEN"] = "1"
     server_process, port = launch_server_cmd(
         (
             "python3 -m sglang.launch_server "
@@ -148,6 +149,8 @@ if __name__ == "__main__":
             f"--model-path {args.model_name_or_path} "
             f"--served-model-name {args.model} "
             "--reasoning-parser qwen3 "
+            "--context-length 131072 "
+            """--json-model-override-args {"rope_scaling":{"rope_type":"yarn","factor":4.0,"original_max_position_embeddings":32768}} """
             "--host 0.0.0.0 "
             "--port 33333"
         )

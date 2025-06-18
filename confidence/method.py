@@ -1,7 +1,7 @@
 import random
 import re
 from enum import Enum
-from typing import assert_never, Any, Coroutine
+from typing import Any, Coroutine, assert_never
 
 from loguru import logger
 from openai.types.chat import ChatCompletionTokenLogprob
@@ -96,7 +96,7 @@ class Method:
         data: Data,
         template: Template,
         temperature: float = 0,
-        max_tokens: int = 16384,
+        max_tokens: int = 100000,
         no_cot_memory: bool = True,
     ) -> Result[Response, str]:
         # ===== First turn =====
@@ -167,7 +167,7 @@ class Method:
         data: Data,
         template: Template,
         temperature: float = 0,
-        max_tokens: int = 16384,
+        max_tokens: int = 100000,
         no_cot_memory: bool = True,
     ) -> Result[tuple[Data, Response], str]:
         # ===== First turn =====
@@ -241,7 +241,7 @@ class Method:
         history_thinking_content: str,
         history_answer_content: str,
         temperature: float = 0,
-        max_tokens: int = 16384,
+        max_tokens: int = 100000,
         no_cot_memory: bool = True,
     ) -> list[Coroutine[Any, Any, Result[tuple[Data, Response], str]]]:
         assert model.model_name in [ModelName.QWEN3_8B_THINK, ModelName.QWEN3_32B_THINK], "Only support Long-CoT model"
@@ -300,7 +300,7 @@ class Method:
         history_thinking_content: str,
         history_answer_content: str,
         temperature: float = 0,
-        max_tokens: int = 16384,
+        max_tokens: int = 100000,
         no_cot_memory: bool = True,
     ) -> list[Coroutine[Any, Any, Result[tuple[Data, Response], str]]]:
         assert model.model_name not in [ModelName.QWEN3_8B_THINK, ModelName.QWEN3_32B_THINK], (
