@@ -1,17 +1,16 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.stats import gaussian_kde
-
 import pandas as pd
 import seaborn as sns
 from pydantic import BaseModel
+from scipy.stats import gaussian_kde
 from tortoise import run_async
 
 from confidence.dataset import DatasetName
 from confidence.logger import Logger
 from confidence.method import MethodName
 from confidence.model import ModelName
-from confidence.template import Template, SubsetSumTemplate, TimeTablingTemplate
+from confidence.template import SubsetSumTemplate, Template, TimeTablingTemplate
 from scripts.visualize.metrics import prf
 
 
@@ -27,6 +26,7 @@ async def main():
     method = MethodName.Verbal_0_100
     no_cot_memory = False
     turn = 0
+    temperature = 0.2
 
     settings = [
         Setting(model=ModelName.QWEN3_8B_THINK, template=TimeTablingTemplate.simple),
@@ -42,7 +42,7 @@ async def main():
         record_cls = dataset.record_cls
         db_logger = Logger(
             db_name=dataset.value + f"--turn{turn}",
-            table_name=f"{dataset}--{method}--no-cot-memory-{no_cot_memory}--{setting.template}--{setting.model}--evaluate-by-{judge_model}",
+            table_name=f"{dataset}--{method}--no-cot-memory-{no_cot_memory}--{setting.template}--{setting.model}--{temperature}--evaluate-by-{judge_model}",
             record_cls=record_cls,
         )
         async with db_logger:

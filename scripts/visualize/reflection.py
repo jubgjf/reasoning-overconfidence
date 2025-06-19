@@ -1,14 +1,17 @@
 import re
+
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
+from scipy.stats import spearmanr
 from tortoise import run_async
 
 from confidence.dataset import DatasetName
 from confidence.logger import Logger
 from confidence.method import MethodName
 from confidence.model import ModelName
-from confidence.template import SubsetSumTemplate
+from confidence.template import SubsetSumTemplate, TimeTablingTemplate
+from scripts.visualize.metrics import prf
 
 
 def count_reflections(history_thinking_content: str) -> int:
@@ -45,19 +48,20 @@ def count_reflections(history_thinking_content: str) -> int:
 
 async def main():
     model = ModelName.QWEN3_8B_THINK
-    template = SubsetSumTemplate.simple
-    # template = TimeTablingTemplate.simple
+    # template = SubsetSumTemplate.simple
+    template = TimeTablingTemplate.simple
     judge_model = ModelName.QWEN3_32B_NO_THINK
-    dataset = DatasetName.SubsetSum
-    # dataset = DatasetName.TimeTabling
+    # dataset = DatasetName.SubsetSum
+    dataset = DatasetName.TimeTabling
     method = MethodName.Verbal_0_100
     no_cot_memory = False
     turn = 0
+    temperature = 0.2
 
     record_cls = dataset.record_cls
     db_logger = Logger(
         db_name=dataset.value + f"--turn{turn}",
-        table_name=f"{dataset}--{method}--no-cot-memory-{no_cot_memory}--{template}--{model}--evaluate-by-{judge_model}",
+        table_name=f"{dataset}--{method}--no-cot-memory-{no_cot_memory}--{template}--{model}--{temperature}--less-reflection--evaluate-by-{judge_model}",
         record_cls=record_cls,
     )
     async with db_logger:
@@ -65,30 +69,17 @@ async def main():
 
     method_records = [record.model_dump() for record in records]
     df = pd.DataFrame(method_records)
-    if method == MethodName.Verbal_0_100:
-        df["model_confidence_extracted"] = df["model_confidence_extracted"].apply(lambda x: x / 100)
+    df = prf(df, method, dataset)
+
+    if dataset == DatasetName.TimeTabling:
+        # df = df[df["answer_count_bin"] < 3]  # easy
+        df = df[df["answer_count_bin"] > 7]  # hard
+        pass  # total
+
+    df["overconfidence_rate"] = df["model_confidence_extracted"] - df["recall"]
 
     df["reflection_times"] = df["model_thinking_response"].apply(count_reflections)
     df["reflection_times_bin"] = df["reflection_times"].apply(lambda x: int(x // 5) if int(x // 5) < 9 else 9)
-
-    df["correct_solution_count"] = df["eval_result"].apply(lambda x: int(x.split("/")[0]))
-    df["total_solution_count"] = df["eval_result"].apply(lambda x: int(x.split("/")[1]))
-
-    df = df[df["correct_solution_count"] <= df["total_solution_count"]]
-    df = df[df["correct_solution_count"] <= df["answer_count"]]
-    df = df[df["total_solution_count"] <= df["answer_count"]]
-
-    if dataset == DatasetName.TimeTabling:
-        df["answer_count_bin"] = df["answer_count"].apply(lambda x: int(x // 50))
-        answer_count_bin_range = 10
-    elif dataset == DatasetName.SubsetSum:
-        df["answer_count_bin"] = df["answer_count"].apply(lambda x: int(x // 50) if int(x // 50) < 6 else 6)
-        answer_count_bin_range = 7
-    else:
-        raise NotImplementedError
-
-    df["recall"] = df["correct_solution_count"] / df["answer_count"]
-    df["precision"] = df["correct_solution_count"] / df["total_solution_count"]
 
     # 只保留数据量大于50的reflection_times_bin
     df = df[
@@ -97,27 +88,28 @@ async def main():
         )
     ]
 
-    if dataset == DatasetName.TimeTabling:
-        df = df[~df["answer_count_bin"].isin([3, 4, 5, 6, 7])]
-        df["difficulty"] = df["answer_count_bin"].apply(lambda x: "easy" if x < 3 else "hard")
-    elif dataset == DatasetName.SubsetSum:
-        df = df[~df["answer_count_bin"].isin([2, 3, 4, 5])]
-        df["difficulty"] = df["answer_count_bin"].apply(lambda x: "easy" if x < 2 else "hard")
+    # 假设“做对”标准为recall==1（可根据实际情况调整）
+    min_correct_reflection = (
+        df[df["recall"] == 1].groupby("question_id")["reflection_times"].min().rename("min_correct_reflection_times")
+    )
+    df = df.merge(min_correct_reflection, on="question_id", how="left")
+    df["reflection_times_norm"] = df["reflection_times"] - df["min_correct_reflection_times"]
+    grouped = df.groupby("reflection_times_norm")[["precision", "recall", "overconfidence_rate"]].mean().reset_index()
 
-    plt.figure()
-    sns.lineplot(data=df, x="reflection_times_bin", y="recall", hue="difficulty")
-    plt.xlabel("Reflection Times Bin")
-    plt.ylabel("Recall")
-    # plt.title("TimeTabling")
-    plt.title("SubsetSum")
-    plt.show()
-
-    plt.figure()
-    sns.lineplot(data=df, x="reflection_times_bin", y="precision", hue="difficulty")
-    plt.xlabel("Reflection Times Bin")
-    plt.ylabel("Precision")
-    # plt.title("TimeTabling")
-    plt.title("SubsetSum")
+    plt.figure(figsize=(15, 5))
+    for i, metric in enumerate(["precision", "recall", "overconfidence_rate"]):
+        valid_df = df[["reflection_times_norm", metric]].dropna()
+        corr, p = spearmanr(valid_df["reflection_times_norm"], valid_df[metric])
+        significant = False if p >= 0.05 else True
+        plt.subplot(1, 3, i + 1)
+        sns.lineplot(data=grouped, x="reflection_times_norm", y=metric, marker="o")
+        plt.xlabel("Normalized Reflection Times")
+        plt.ylabel(metric.capitalize())
+        plt.title(
+            f"{metric.capitalize()} vs Normalized Reflection Times\n"
+            f"Spearmanr Corr: {corr:.2f}, p: {p:.2g} {'(Significant)' if significant else '(Not Significant)'}"
+        )
+    plt.tight_layout()
     plt.show()
 
 

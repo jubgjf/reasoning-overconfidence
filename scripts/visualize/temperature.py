@@ -1,8 +1,8 @@
 import pandas as pd
+import seaborn as sns
 from matplotlib import pyplot as plt
 from pydantic import BaseModel
 from tortoise import run_async
-import seaborn as sns
 
 from confidence.dataset import DatasetName
 from confidence.logger import Logger
@@ -24,15 +24,15 @@ async def main():
     method = MethodName.Verbal_0_100
     no_cot_memory = False
     model = ModelName.QWEN3_8B_NO_THINK
-    template = TimeTablingTemplate.simple
+    template = TimeTablingTemplate.cot
     turn = 0
 
     records_list = []
     for temperature in [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]:
         record_cls = dataset.record_cls
         db_logger = Logger(
-            db_name=dataset.value + f"--turn{turn}--temp{temperature}",
-            table_name=f"{dataset}--{method}--no-cot-memory-{no_cot_memory}--{template}--{model}-{temperature}--evaluate-by-{judge_model}",
+            db_name=dataset.value + f"--turn{turn}",
+            table_name=f"{dataset}--{method}--no-cot-memory-{no_cot_memory}--{template}--{model}--{temperature}--evaluate-by-{judge_model}",
             record_cls=record_cls,
         )
         async with db_logger:

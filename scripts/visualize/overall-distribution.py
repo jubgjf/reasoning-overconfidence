@@ -5,11 +5,12 @@ import seaborn as sns
 from pydantic import BaseModel
 from tortoise import run_async
 
-from confidence.template import TimeTablingTemplate, Template
 from confidence.dataset import DatasetName
 from confidence.logger import Logger
 from confidence.method import MethodName
 from confidence.model import ModelName
+from confidence.template import Template, TimeTablingTemplate
+from scripts.visualize.metrics import prf
 
 
 class Setting(BaseModel):
@@ -22,10 +23,10 @@ async def main():
     dataset = DatasetName.TimeTabling
     method = MethodName.Verbal_0_100
     no_cot_memory = False
+    temperature = 0.2
 
     settings = [
         Setting(model=ModelName.QWEN3_8B_THINK, template=TimeTablingTemplate.simple),
-        Setting(model=ModelName.QWEN3_8B_NO_THINK, template=TimeTablingTemplate.simple),
         Setting(model=ModelName.QWEN3_8B_NO_THINK, template=TimeTablingTemplate.cot),
     ]
 
@@ -34,7 +35,7 @@ async def main():
         record_cls = dataset.record_cls
         db_logger = Logger(
             db_name=dataset.value,
-            table_name=f"{dataset}--{method}--no-cot-memory-{no_cot_memory}--{setting.template}--{setting.model}--evaluate-by-{judge_model}",
+            table_name=f"{dataset}--{method}--no-cot-memory-{no_cot_memory}--{setting.template}--{setting.model}--{temperature}--evaluate-by-{judge_model}",
             record_cls=record_cls,
         )
         async with db_logger:
@@ -42,16 +43,14 @@ async def main():
 
         method_records = [record.model_dump() for record in records]
         df = pd.DataFrame(method_records)
-        if method == MethodName.Verbal_0_100:
-            df["model_confidence_extracted"] = df["model_confidence_extracted"].apply(lambda x: x / 100)
         df["setting"] = f"{setting.model}--{setting.template}"
 
         records_list.append(df)
 
     df = pd.concat(records_list)
+    df = prf(df, method, dataset)
 
     df.loc[df["setting"] == "qwen3-8b-no_think--cot", "setting"] = "Short-CoT"
-    df.loc[df["setting"] == "qwen3-8b-no_think--simple", "setting"] = "no-CoT"
     df.loc[df["setting"] == "qwen3-8b-think--simple", "setting"] = "Long-CoT"
 
     bins = np.linspace(0, 1, 11)

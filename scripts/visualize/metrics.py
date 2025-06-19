@@ -31,33 +31,21 @@ def prf(df: pd.DataFrame, method: MethodName, dataset: DatasetName) -> pd.DataFr
     return df
 
 
-def ece(
-    df: pd.DataFrame, conf_col: str = "model_confidence_extracted", acc_col: str = "precision", n_bins: int = 10
-) -> float:
-    assert conf_col in df.columns
-    assert acc_col in df.columns
-
-    bins = np.linspace(0, 1, n_bins + 1)
-    df = df.copy()
-    df["bin"] = pd.cut(df[conf_col], bins=bins, include_lowest=True, labels=False)
+def ece(df: pd.DataFrame, only_over_confidence: bool = False) -> float:
+    bins = np.linspace(0, 1, 11)
+    df["bin"] = pd.cut(df["model_confidence_extracted"], bins=bins, include_lowest=True, labels=False)
     ece = 0
     N = len(df)
-    for b in range(n_bins):
+    for b in range(10):
         bin_data = df[df["bin"] == b]
         if len(bin_data) == 0:
             continue
-
-        # Check if there are non-NaN values to calculate mean
-        if bin_data[acc_col].isnull().all() or bin_data[conf_col].isnull().all():
-            continue  # Skip this bin if all values are NaN
-
-        acc = bin_data[acc_col].mean()
-        conf = bin_data[conf_col].mean()
-
-        if pd.isna(acc) or pd.isna(conf):  # Double check for NaNs after mean calculation
-            continue  # Skip if mean still resulted in NaN
-
-        ece += len(bin_data) / N * abs(acc - conf)
+        acc = (bin_data["recall"] == 1).mean()  # 或用 precision
+        conf = bin_data["model_confidence_extracted"].mean()
+        if only_over_confidence:
+            ece += len(bin_data) / N * max(conf - acc, 0)
+        else:
+            ece += len(bin_data) / N * abs(acc - conf)
     return ece
 
 
@@ -69,3 +57,16 @@ def route_dependence(df: pd.DataFrame):
 def stability(df: pd.DataFrame):
     # 稳定性：同一问题多次回答，模型在多论反思重新考虑时，是否经常改变答案，如果从不改变并且给出的答案是错的，说明过度自信
     ...
+
+
+def show_metrics(df: pd.DataFrame, setting_name: str):
+    print(setting_name)
+    metrics = {
+        "Precision": df["precision"].mean(),
+        "Recall": df["recall"].mean(),
+        "ECE(r)": ece(df),
+        "EOE(r)": ece(df, only_over_confidence=True),
+    }
+    print(",".join(metrics.keys()))
+    print(",".join(f"{value * 100:.2f}" for value in metrics.values()))
+    print("==========================================")
