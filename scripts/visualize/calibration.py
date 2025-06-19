@@ -1,14 +1,14 @@
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 from pydantic import BaseModel
 from tortoise import run_async
 
-import numpy as np
 from confidence.dataset import DatasetName
 from confidence.logger import Logger
 from confidence.method import MethodName
 from confidence.model import ModelName
-from confidence.template import Template, SubsetSumTemplate, TimeTablingTemplate
+from confidence.template import SubsetSumTemplate, Template, TimeTablingTemplate
 from scripts.visualize.metrics import prf
 
 
@@ -101,7 +101,26 @@ async def main():
         for i in range(10):
             bin_group = group[group["confidence_bin"] == i]
             if not bin_group.empty:
-                mean_accuracys[i] = bin_group["mean_accuracy"].values[0]
+                acc = bin_group["mean_accuracy"].values[0]
+                # 如果acc为0则跳过该点
+                if acc == 0:
+                    continue
+                mean_accuracys[i] = acc
+        # 拟合直线
+        valid = ~np.isnan(mean_accuracys)
+        x = bin_centers[valid]
+        y = mean_accuracys[valid]
+        if len(x) > 1:
+            k, b = np.polyfit(x, y, 1)
+            angle_rad = np.arctan(k) - np.arctan(1)
+            angle_deg = np.degrees(angle_rad)
+            # 绘制拟合直线
+            fit_y = k * x + b
+            ax.plot(
+                x, fit_y, color=color, linestyle=":", linewidth=2, label=f"Fitted line (angle diff={angle_deg:.2f}°)"
+            )
+        else:
+            angle_deg = float("nan")
         ax.bar(
             bin_centers,
             mean_accuracys,
@@ -112,13 +131,12 @@ async def main():
             edgecolor="black",
             color=color,
         )
-        valid = ~np.isnan(mean_accuracys)
         ax.plot(bin_centers[valid], mean_accuracys[valid], marker="o", linestyle="-", linewidth=2, color=color)
         ax.plot([0, 1], [0, 1], linestyle="--", color="gray", label="Perfectly Calibrated")
         ax.set_xlabel("Confidence")
         ax.set_xlim(0, 1)
         ax.set_ylim(0, 1)
-        ax.set_title(setting)
+        ax.set_title(f"{setting}\nAngle diff: {angle_deg:.2f}°")
         ax.grid(True)
         ax.legend()
     axes[0].set_ylabel("Recall")

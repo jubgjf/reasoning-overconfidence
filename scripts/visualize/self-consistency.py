@@ -158,7 +158,26 @@ async def main():
         for i in range(10):
             bin_group = group[group["confidence_bin"] == i]
             if not bin_group.empty:
-                mean_accuracys[i] = bin_group["mean_accuracy"].values[0]
+                acc = bin_group["mean_accuracy"].values[0]
+                # 如果acc为0则跳过该点
+                if acc == 0:
+                    continue
+                mean_accuracys[i] = acc
+        # 拟合直线
+        valid = ~np.isnan(mean_accuracys)
+        x = bin_centers[valid]
+        y = mean_accuracys[valid]
+        if len(x) > 1:
+            k, b = np.polyfit(x, y, 1)
+            angle_rad = np.arctan(k) - np.arctan(1)
+            angle_deg = np.degrees(angle_rad)
+            # 绘制拟合直线
+            fit_y = k * x + b
+            ax.plot(
+                x, fit_y, color=color, linestyle=":", linewidth=2, label=f"Fitted line (angle diff={angle_deg:.2f}°)"
+            )
+        else:
+            angle_deg = float("nan")
         ax.bar(
             bin_centers,
             mean_accuracys,
@@ -169,13 +188,12 @@ async def main():
             edgecolor="black",
             color=color,
         )
-        valid = ~np.isnan(mean_accuracys)
         ax.plot(bin_centers[valid], mean_accuracys[valid], marker="o", linestyle="-", linewidth=2, color=color)
         ax.plot([0, 1], [0, 1], linestyle="--", color="gray", label="Perfectly Calibrated")
         ax.set_xlabel("Confidence")
         ax.set_xlim(0, 1)
         ax.set_ylim(0, 1)
-        ax.set_title(method_label, fontsize=10)
+        ax.set_title(f"{method_label}\nAngle diff: {angle_deg:.2f}°", fontsize=10)
         ax.grid(True)
         ax.legend(fontsize=8)
     axes[0].set_ylabel("Recall")
@@ -183,8 +201,6 @@ async def main():
     plt.tight_layout(rect=[0, 0, 1, 0.95])
     plt.show()
 
-
-# ...existing code...
 
 if __name__ == "__main__":
     run_async(main())
