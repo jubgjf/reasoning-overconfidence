@@ -61,7 +61,7 @@ class Model:
         self,
         messages: list[dict[str, str]],
         temperature: float = 0,
-        max_tokens: int = 100000,
+        max_tokens: int = 32768,
         logprobs: bool = False,
     ) -> Result[ChatAPIResponse, str]:
         async def request_once() -> Result[ChatAPIResponse, str]:
@@ -109,7 +109,7 @@ class Model:
         self,
         prompt: str,
         temperature: float = 0,
-        max_tokens: int = 100000,
+        max_tokens: int = 32768,
         logprobs: bool = False,
     ) -> Result[CompleteAPIResponse, str]:
         async def request_once() -> Result[CompleteAPIResponse, str]:
