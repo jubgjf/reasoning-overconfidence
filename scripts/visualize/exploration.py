@@ -6,7 +6,7 @@ import numpy as np
 
 from confidence.dataset import DatasetName
 from confidence.logger import Logger
-from confidence.method import MethodName
+from confidence import MethodName
 from confidence.model import ModelName
 from confidence.template import Template, TimeTablingTemplate
 from scripts.visualize.metrics import prf, show_metrics

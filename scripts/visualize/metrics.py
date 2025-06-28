@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 
 from confidence.dataset import DatasetName
-from confidence.method import MethodName
+from confidence import MethodName
 
 
 def prf(df: pd.DataFrame, method: MethodName, dataset: DatasetName) -> pd.DataFrame:

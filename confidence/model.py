@@ -5,11 +5,11 @@ from enum import Enum
 from dotenv import load_dotenv
 from loguru import logger
 from openai import AsyncOpenAI
-from openai.types.chat import ChatCompletionTokenLogprob
-from openai.types.completion_choice import Logprobs
 from pydantic import BaseModel
-from result import Err, Ok, Result
 from transformers import AutoTokenizer
+
+from confidence.result import Result
+from confidence.utils import split_thinking_answer
 
 
 class ModelName(Enum):
@@ -26,14 +26,9 @@ class ModelName(Enum):
         return self.value
 
 
-class ChatAPIResponse(BaseModel):
-    message_content: str
-    logprobs_content: list[ChatCompletionTokenLogprob] | None
-
-
-class CompleteAPIResponse(BaseModel):
-    text_content: str
-    logprobs_content: Logprobs | None
+class ChatResponse(BaseModel):
+    messages: list[dict[str, str]]
+    thinking: list[str] | None
 
 
 class Model:
@@ -57,24 +52,54 @@ class Model:
 
         return AsyncOpenAI(base_url=base_url, api_key=api_key, timeout=1800)
 
-    async def request(
+    async def chat(
         self,
         messages: list[dict[str, str]],
         temperature: float = 0,
-        max_tokens: int = 32768,
-        logprobs: bool = False,
-    ) -> Result[ChatAPIResponse, str]:
-        async def request_once() -> Result[ChatAPIResponse, str]:
+        max_completion_tokens: int = 32768,
+    ) -> Result[ChatResponse, str]:
+        """
+        "[[ASSISTANT]]" is a placeholder for the assistant's response.
+
+        Example of incoming `messages`:
+        ```python
+        messages = [
+            {"role": "user", "content": "What is the capital of France?"},
+            {"role": "assistant", "content": "[[ASSISTANT]]"},
+            {"role": "user", "content": "What is your confidence?"},
+            {"role": "assistant", "content": "[[ASSISTANT]]"},
+        ]
+        ```
+
+        And return is like:
+        ```python
+        (
+            [
+                {"role": "user", "content": "What is the capital of France?"},
+                {"role": "assistant", "content": "Paris"},                  # No thinking content
+                {"role": "user", "content": "What is your confidence?"},
+                {"role": "assistant", "content": "90%"},                    # No thinking content
+            ],
+            [
+                "Okay, the capital of France is ...</think>",        # Thinking content is here
+                "Okay, my confidence is ...</think>",                # Thinking content is here
+            ]
+        )
+        ```
+
+        len(thinking_content) is equal to "[[ASSISTANT]]" count in `messages`.
+        """
+
+        async def request_once(messages_no_placeholder: list[dict[str, str]]) -> Result[str, str]:
             try:
                 response = await self._client.chat.completions.create(
                     model=self.model_name.model_id,
-                    messages=messages,
+                    messages=messages_no_placeholder,
                     temperature=temperature,
-                    max_tokens=max_tokens,
-                    logprobs=logprobs,
-                    top_logprobs=5 if logprobs else None,
+                    max_completion_tokens=max_completion_tokens,
                 )
-                if self.model_name in [ModelName.QWEN3_8B_THINK]:
+                if self.model_name in [ModelName.QWEN3_8B_THINK, ModelName.QWEN3_32B_THINK]:
+                    assert response.choices[0].message.model_extra is not None
                     assert response.choices[0].message.model_extra["reasoning_content"] is not None
                     message_content = (
                         response.choices[0].message.model_extra["reasoning_content"]
@@ -82,64 +107,83 @@ class Model:
                         + response.choices[0].message.content
                     )
                 else:
+                    assert response.choices[0].message.content is not None
                     message_content = response.choices[0].message.content
-                return Ok(
-                    ChatAPIResponse(
-                        message_content=message_content,
-                        logprobs_content=response.choices[0].logprobs.content if logprobs else None,
-                    )
-                )
+                return Result(ok=message_content)
             except Exception as e:
-                err_msg = f"Error: {e}"
-                return Err(err_msg)
+                return Result(err=f"Error: {e}")
 
-        retry, tolerance = 0, 5
-        response_result = Err("Failed to request")
-        while retry < tolerance:
-            response_result = await request_once()
-            if response_result.is_ok():
+        def _extract_prompt(messages: list[dict[str, str]]) -> tuple[list[dict[str, str]] | None, int | None]:
+            assert len(messages) % 2 == 0
+
+            for i in range(0, len(messages), 2):
+                user_turn, assistant_turn = messages[i], messages[i + 1]
+                assert user_turn["role"] == "user"
+                assert assistant_turn["role"] == "assistant"
+
+                if "[[ASSISTANT]]" in assistant_turn["content"]:
+                    return messages[: i + 1], i + 1
+
+            return None, None
+
+        placeholder_count = sum([1 if "[[ASSISTANT]]" in turn["content"] else 0 for turn in messages])
+        assert placeholder_count % 2 == 0
+
+        thinking_list = []
+        while True:
+            extracted_messages, placeholder_index = _extract_prompt(messages)
+            if extracted_messages is None and placeholder_index is None:
                 break
-            retry += 1
-            logger.error(f"Retry: {retry}/{tolerance}. Failure: {response_result.err_value} ")
-            await asyncio.sleep(0.1)
+            assert extracted_messages is not None and placeholder_index is not None
 
-        return response_result
+            retry, tolerance = 0, 3
+            response_result = Result(err="Failed to request")
+            while retry < tolerance:
+                response_result = await request_once(extracted_messages)
+                if response_result.is_ok():
+                    break
+                retry += 1
+                logger.error(f"Retry: {retry}/{tolerance}. Failure: {response_result.err_value} ")
+                await asyncio.sleep(0.1)
+            else:
+                return Result(err=response_result.err_value)
+            thinking_content, answer_content = split_thinking_answer(response_result.ok_value)
+            messages[placeholder_index]["content"] = answer_content
+            thinking_list.append(thinking_content)
+
+        assert messages[-1]["role"] == "assistant"
+        assert len(thinking_list) == placeholder_count
+
+        thinking = None if all(t == "" for t in thinking_list) else thinking_list
+        return Result(ok=ChatResponse(messages=messages, thinking=thinking))
 
     async def complete(
         self,
         prompt: str,
         temperature: float = 0,
-        max_tokens: int = 32768,
-        logprobs: bool = False,
-    ) -> Result[CompleteAPIResponse, str]:
-        async def request_once() -> Result[CompleteAPIResponse, str]:
+        max_tokens: int = 20480,
+    ) -> Result[str, str]:
+        async def request_once() -> Result[str, str]:
             try:
                 response = await self._client.completions.create(
                     model=self.model_name.model_id,
                     prompt=prompt,
                     temperature=temperature,
                     max_tokens=max_tokens,
-                    logprobs=5 if logprobs else None,
                 )
-                return Ok(
-                    CompleteAPIResponse(
-                        text_content=response.choices[0].text,
-                        logprobs_content=response.choices[0].logprobs if logprobs else None,
-                    )
-                )
+                return Result(ok=response.choices[0].text)
             except Exception as e:
                 err_msg = f"Error: {e}"
-                return Err(err_msg)
+                return Result(err=err_msg)
 
-        # TODO refactor request&complete
-        retry, tolerance = 0, 5
-        response_result = Err("Failed to request")
+        retry, tolerance = 0, 3
+        response_result = Result(err="Failed to request")
         while retry < tolerance:
             response_result = await request_once()
             if response_result.is_ok():
                 break
             retry += 1
-            logger.error(f"Retry: {retry}/{tolerance}. Failure: {response_result.err_value} ")
+            logger.error(f"Retry: {retry}/{tolerance}. Failure: {response_result.err} ")
             await asyncio.sleep(0.1)
 
         return response_result

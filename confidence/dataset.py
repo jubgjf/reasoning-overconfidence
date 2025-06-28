@@ -7,8 +7,8 @@ from typing import Type
 from pydantic import BaseModel
 from typing_extensions import TypeVar
 
-from .data import Data, TimeTablingData, SubsetSumData
-from .logger import Record, TimeTablingRecord, SubsetSumRecord
+from .data import Data, SubsetSumData, TimeTablingData
+from .logger import Record, SubsetSumRecord, TimeTablingRecord
 
 
 class DatasetName(Enum):

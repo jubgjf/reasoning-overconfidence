@@ -1,6 +1,7 @@
 from abc import ABC
 from typing import Type, TypeVar
 
+import pandas as pd
 from loguru import logger
 from pydantic import BaseModel
 from pydantic.fields import FieldInfo
@@ -8,31 +9,21 @@ from tortoise import Tortoise, fields
 from tortoise.contrib.pydantic import pydantic_queryset_creator
 from tortoise.models import Model as TortoiseModel
 
-from .data import TimeTablingData, SubsetSumData
+from .data import SubsetSumData, TimeTablingData
 
 TableClass: Type[TortoiseModel]
 
 
 class IRecord(ABC, BaseModel):
-    model_thinking_response: str
-    model_answer_response: str
-    model_answer_extracted: str
-    model_confidence_response: str
-    model_confidence_extracted: float
-    template: str
-    method: str
-    history: dict  # dict[str, str]
+    chat_history: list
+    thinking_history: list
     model: str
+    dataset: str
+    template: str
+    temperature: float
     ref: str  # Some addition notes, can be empty
     eval_result: str  # The result of evaluation, can be empty
     git_hash: str
-
-
-def list_history_to_dict(history: list[dict[str, str]]) -> dict[str, str]:
-    dict_history = {}
-    for i, turn in enumerate(history):
-        dict_history[f"{turn['role']}_{i // 2}"] = turn["content"]
-    return dict_history
 
 
 def _make_tabel_cls(record_cls: Type[IRecord], table_name: str):
@@ -55,7 +46,7 @@ def _make_tabel_cls(record_cls: Type[IRecord], table_name: str):
                 table_columns[name] = fields.CharField(max_length=100000, primary_key=True)
             else:
                 table_columns[name] = fields.CharField(max_length=100000)
-        elif field_type == dict or field_type == dict[str, str]:
+        elif field_type == dict or field_type == dict[str, str] or field_type == list:
             table_columns[name] = fields.JSONField()
         else:
             raise TypeError(f"Unsupported field type {field_type} for {name} ({type(name)})")
@@ -109,10 +100,17 @@ class Logger:
         records = await TableClass.all().values("question_id")
         return [record["question_id"] for record in records]
 
-    async def chat_history(self) -> dict[str | int, dict[str, str]]:
+    async def history(self) -> dict[str | int, tuple[list[dict[str, str]], list[str]]]:
         global TableClass
-        records = await TableClass.all().values("question_id", "history")
-        return {qh["question_id"]: qh["history"] for qh in records}
+        records = await TableClass.all().values("question_id", "chat_history", "thinking_history")
+        return {qh["question_id"]: (qh["chat_history"], qh["thinking_history"]) for qh in records}
+
+    async def dump(self) -> pd.DataFrame:
+        global TableClass
+        records = await self.fetch()
+        records = [record.model_dump() for record in records]
+        df = pd.DataFrame(records)
+        return df
 
 
 class TimeTablingRecord(IRecord, TimeTablingData): ...
