@@ -21,8 +21,6 @@ class IRecord(ABC, BaseModel):
     dataset: str
     template: str
     temperature: float
-    ref: str  # Some addition notes, can be empty
-    eval_result: str  # The result of evaluation, can be empty
     git_hash: str
 
 

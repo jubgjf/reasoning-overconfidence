@@ -79,8 +79,6 @@ async def main(args: Argument):
                 dataset=args.dataset.value,
                 template=args.template,
                 temperature=args.temperature,
-                ref="",
-                eval_result="",
                 git_hash=last_git_hash(),
             )
             await db_logger.insert(record)

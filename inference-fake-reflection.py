@@ -101,8 +101,6 @@ async def main(args: Argument):
                 dataset=args.dataset.value,
                 template=args.template,
                 temperature=args.temperature,
-                ref=f"{data.question_id}--variant",
-                eval_result="",
                 git_hash=last_git_hash(),
             )
             await db_logger.insert(record)

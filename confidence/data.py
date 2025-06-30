@@ -11,16 +11,9 @@ class TimeTablingData(BaseModel):
     answers: dict[str, str]
     answer_count: int
 
-    def task_description(self) -> str:
-        return (
-            "You are asked to perform a timetabling task.\n"
-            "Your task is to find ALL FEASIBLE SCHEDULES that satisfies all constraints.\n"
-            "The question is\n"
-            f"{self.question}\n"
-        )
-
     def ask_for_solve(self, template_name: Template) -> str:
         packed_question = (
+            "You are asked to perform a timetabling task.\n"
             "Please find ALL FEASIBLE SCHEDULES that satisfies all constraints one by one and output the number of feasible schedules.\n"
             "Output format example:\n"
             "Solution 1:\n"
@@ -39,6 +32,8 @@ class TimeTablingData(BaseModel):
             "\n"
             "Total xxx feasible solutions shown above.\n"
             "\n"
+            "The question is\n"
+            f"{self.question}\n"
             "You must output all feasible solutions without using ellipsis, etc.\n"
             "The most important thing is to FIND THE SPECIFIC CONTENT OF EACH SOLUTION, "
             "rather than just counting the number of solutions.\n"
@@ -54,16 +49,9 @@ class SubsetSumData(BaseModel):
     question: str
     answer_count: int
 
-    def task_description(self) -> str:
-        return (
-            "You are asked to perform a subset-sum task.\n"
-            "Your task is to find ALL FEASIBLE SUBSETS that meet the requirements.\n"
-            "The question is\n"
-            f"{self.question}\n"
-        )
-
     def ask_for_solve(self, template_name: Template) -> str:
         packed_question = (
+            "You are asked to perform a subset-sum task.\n"
             "Please find ALL FEASIBLE SUBSETS that meet the requirements one by one and output the number of feasible subsets.\n"
             "Output format example:\n"
             "Solution 1: {1, 3, 5}\n"
@@ -72,6 +60,8 @@ class SubsetSumData(BaseModel):
             "\n"
             "Total xxx feasible solutions shown above.\n"
             "\n"
+            "The question is\n"
+            f"{self.question}\n"
             "You must output all feasible solutions without using ellipsis, etc.\n"
             "The most important thing is to FIND THE SPECIFIC CONTENT OF EACH SOLUTION, "
             "rather than just counting the number of solutions.\n"

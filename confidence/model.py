@@ -127,7 +127,6 @@ class Model:
             return None, None
 
         placeholder_count = sum([1 if "[[ASSISTANT]]" in turn["content"] else 0 for turn in messages])
-        assert placeholder_count % 2 == 0
 
         thinking_list = []
         while True:
