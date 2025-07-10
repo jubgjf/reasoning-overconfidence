@@ -75,7 +75,7 @@ async def main(args: Argument):
                 chat_history=chat_history,
                 thinking_history=thinking_history,
                 temperature=args.temperature,
-                max_completion_tokens=32768,
+                max_completion_tokens=20480,
             )
             for data, chat_history, thinking_history in dataset_history_pair.values()
         ]

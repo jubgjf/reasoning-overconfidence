@@ -34,7 +34,7 @@ async def request(
     temperature: float,
 ) -> tuple[Data, Result[ChatResponse, str]]:
     response_result = await confidence.request(
-        model, data, template, temperature=temperature, max_completion_tokens=32768
+        model, data, template, temperature=temperature, max_completion_tokens=20480
     )
     return data, response_result
 

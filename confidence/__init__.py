@@ -106,7 +106,7 @@ async def _request_fake_reflection(
 
     # ===== turn 0 (model.complete) =====
     if prompt.endswith("</think>"):
-        prompt = prompt[:-len("</think>")]
+        prompt = prompt[: -len("</think>")]
     response_result = await model.complete(
         prompt=prompt, max_tokens=int(max_completion_tokens * 2 / 3), temperature=temperature
     )
@@ -166,9 +166,13 @@ async def _request_fake_reflection(
 
     assert len(response_result.ok_value.messages) == 6  # Total 3 turns, each turn has 2 messages (user and assistant)
     if model.model_name in [ModelName.QWEN3_8B_THINK, ModelName.QWEN3_32B_THINK]:
-        assert turn_0_thinking_content != ""
-        assert response_result.ok_value.thinking is not None
-        assert len(response_result.ok_value.thinking) == 2  # Only turn 1 and turn 2 have thinking content
+        if turn_0_thinking_content == "":
+            return Result(err="turn_0_thinking_content is empty")
+        if response_result.ok_value.thinking is None:
+            return Result(err="response_result.ok_value.thinking is None")
+        if len(response_result.ok_value.thinking) != 2:
+            # Only turn 1 and turn 2 have thinking content
+            return Result(err="len(response_result.ok_value.thinking) != 2")
         thinking = [
             turn_0_thinking_content,
             response_result.ok_value.thinking[0],

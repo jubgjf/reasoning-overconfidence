@@ -101,6 +101,10 @@ class Model:
                 if self.model_name in [ModelName.QWEN3_8B_THINK, ModelName.QWEN3_32B_THINK]:
                     assert response.choices[0].message.model_extra is not None
                     assert response.choices[0].message.model_extra["reasoning_content"] is not None
+                    if response.choices[0].message.content is None:
+                        return Result(
+                            err="response.choices[0].message.content is None but reasoning_content is not None, consider increase max_new_tokens"
+                        )
                     message_content = (
                         response.choices[0].message.model_extra["reasoning_content"]
                         + "</think>"
