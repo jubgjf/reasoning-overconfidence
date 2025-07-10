@@ -298,6 +298,63 @@ def compute_precision_recall(model_output: str, ground_truth_answers: str, answe
     }
 
 
+def prf_bf62eb6(df: pd.DataFrame, dataset: DatasetName) -> pd.DataFrame:
+    """
+    计算precision, recall和相关指标，使用后处理方法而非legacy数据库列
+
+    Args:
+        df: 包含model_thinking_response, model_answer_response, model_confidence_extracted(0~100)等列的DataFrame
+        dataset: 数据集类型
+
+    Returns:
+        pd.DataFrame: 添加了precision, recall等列的DataFrame
+    """
+    precision_list = []
+    recall_list = []
+    correct_solution_count_list = []
+    total_solution_count_list = []
+
+    for _, row in df.iterrows():
+        model_output = row["model_answer_response"]
+
+        # 获取真实答案
+        answers = row["answers"]
+        ground_truth_answers = answers.get("0", "") if isinstance(answers, dict) else ""
+        answer_count = row["answer_count"]
+
+        # 计算precision和recall
+        metrics = compute_precision_recall(model_output, ground_truth_answers, answer_count)
+
+        precision_list.append(metrics["precision"])
+        recall_list.append(metrics["recall"])
+        correct_solution_count_list.append(metrics["correct_solution_count"])
+        total_solution_count_list.append(metrics["total_solution_count"])
+
+    df["model_confidence_extracted"] = df["model_confidence_extracted"] / 100.0
+
+    # 添加计算结果到DataFrame
+    df = df.copy()
+    df["precision"] = precision_list
+    df["recall"] = recall_list
+    df["correct_solution_count"] = correct_solution_count_list
+    df["total_solution_count"] = total_solution_count_list
+
+    # 过滤无效数据
+    df = df[df["correct_solution_count"] <= df["total_solution_count"]]
+    df = df[df["correct_solution_count"] <= df["answer_count"]]
+    df = df[df["total_solution_count"] <= df["answer_count"]]
+
+    # 创建answer_count_bin
+    if dataset == DatasetName.TimeTabling:
+        df["answer_count_bin"] = df["answer_count"].apply(lambda x: int(x // 50))
+    elif dataset == DatasetName.SubsetSum:
+        df["answer_count_bin"] = df["answer_count"].apply(lambda x: int(x // 50) if int(x // 50) < 6 else 6)
+    else:
+        raise NotImplementedError
+
+    return df
+
+
 def prf(df: pd.DataFrame, dataset: DatasetName) -> pd.DataFrame:
     """
     计算precision, recall和相关指标，使用后处理方法而非legacy数据库列
@@ -317,7 +374,7 @@ def prf(df: pd.DataFrame, dataset: DatasetName) -> pd.DataFrame:
     for _, row in df.iterrows():
         # 获取模型输出（通常在chat_history的第4个元素，即索引3）
         chat_history = row["chat_history"]
-        if len(chat_history) < 4:
+        if len(chat_history) < 6:
             # 如果chat_history长度不够，使用默认值
             precision_list.append(0.0)
             recall_list.append(0.0)
@@ -325,7 +382,7 @@ def prf(df: pd.DataFrame, dataset: DatasetName) -> pd.DataFrame:
             total_solution_count_list.append(0)
             continue
 
-        model_output = chat_history[3]["content"]
+        model_output = chat_history[1]["content"]
 
         # 获取真实答案
         answers = row["answers"]
@@ -363,6 +420,35 @@ def prf(df: pd.DataFrame, dataset: DatasetName) -> pd.DataFrame:
     return df
 
 
+def ece_bf62eb6(df: pd.DataFrame) -> float:
+    """
+    计算Expected Calibration Error (ECE)，使用从chat_history提取的置信度
+
+    Args:
+        df: 包含recall等列的DataFrame
+
+    Returns:
+        float: ECE值
+    """
+
+    # 计算ECE
+    # 注意：置信度是0-100范围，需要归一化到0-1
+    confidence_normalized = df["model_confidence_extracted"]
+    bins = [i / 10.0 for i in range(11)]  # [0.0, 0.1, 0.2, ..., 1.0]
+    df["bin"] = pd.cut(confidence_normalized, bins=bins, include_lowest=True, labels=False)
+    ece = 0
+    N = len(df)
+
+    for b in range(10):
+        bin_data = df[df["bin"] == b]
+        if len(bin_data) == 0:
+            continue
+        acc = (bin_data["recall"] == 1).mean()  # 或用 precision
+        conf = confidence_normalized[bin_data.index].mean()
+        ece += len(bin_data) / N * abs(acc - conf)
+    return ece
+
+
 def ece(df: pd.DataFrame) -> float:
     """
     计算Expected Calibration Error (ECE)，使用从chat_history提取的置信度
@@ -383,7 +469,7 @@ def ece(df: pd.DataFrame) -> float:
             continue
 
         # 从第二个消息中提取置信度（索引1）
-        content = chat_history[1]["content"]
+        content = chat_history[3]["content"]
         confidence_result = extract_confidence(content)
 
         if confidence_result.ok is not None:
@@ -399,7 +485,7 @@ def ece(df: pd.DataFrame) -> float:
 
     # 计算ECE
     # 注意：置信度是0-100范围，需要归一化到0-1
-    confidence_normalized = valid_df["model_confidence_extracted"] / 100.0
+    confidence_normalized = valid_df["model_confidence_extracted"]
     bins = [i / 10.0 for i in range(11)]  # [0.0, 0.1, 0.2, ..., 1.0]
     valid_df["bin"] = pd.cut(confidence_normalized, bins=bins, include_lowest=True, labels=False)
     ece = 0
@@ -428,6 +514,7 @@ def show_metrics(df: pd.DataFrame, setting_name: str):
         "Precision": df["precision"].mean(),
         "Recall": df["recall"].mean(),
         "ECE(r)": ece(df),
+        # "ECE(r)": ece_bf62eb6(df),
     }
     print(",".join(metrics.keys()))
     print(",".join(f"{value * 100:.2f}" for value in metrics.values()))

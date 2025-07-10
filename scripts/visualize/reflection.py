@@ -3,15 +3,13 @@ import re
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
-from scipy.stats import spearmanr
+from scipy.stats import mannwhitneyu, spearmanr
 from tortoise import run_async
 
 from confidence.dataset import DatasetName
+from confidence.evaluate import add_confidence_column, prf
 from confidence.logger import Logger
-from confidence import MethodName
 from confidence.model import ModelName
-from confidence.template import SubsetSumTemplate, TimeTablingTemplate
-from scripts.visualize.metrics import prf
 
 
 def count_reflections(history_thinking_content: str) -> int:
@@ -48,43 +46,47 @@ def count_reflections(history_thinking_content: str) -> int:
 
 async def main():
     model = ModelName.QWEN3_8B_THINK
-    # template = SubsetSumTemplate.simple
-    template = TimeTablingTemplate.simple
-    judge_model = ModelName.QWEN3_32B_NO_THINK
-    # dataset = DatasetName.SubsetSum
+    template = "simple"
     dataset = DatasetName.TimeTabling
-    method = MethodName.Verbal_0_100
-    no_cot_memory = False
     turn = 0
     temperature = 0.2
 
     record_cls = dataset.record_cls
-    db_logger = Logger(
-        db_name=dataset.value + f"--turn{turn}",
-        table_name=f"{dataset}--{method}--no-cot-memory-{no_cot_memory}--{template}--{model}--{temperature}--less-reflection--evaluate-by-{judge_model}",
-        record_cls=record_cls,
-    )
+    title = f"{dataset}--{template}--{model}--{temperature}--{turn}--less"
+    db_logger = Logger(db_name=title, table_name=title, record_cls=record_cls)
     async with db_logger:
         records = await db_logger.fetch()
 
     method_records = [record.model_dump() for record in records]
     df = pd.DataFrame(method_records)
-    df = prf(df, method, dataset)
+    if model == ModelName.QWEN3_8B_NO_THINK and template == "cot":
+        df["setting"] = "Short-CoT"
+    elif model == ModelName.QWEN3_8B_THINK and template == "simple":
+        df["setting"] = "Long-CoT"
+    else:
+        raise ValueError(f"Unknown setting: {model}--{template}")
+    df = pd.DataFrame(method_records)
+
+    df = prf(df, dataset)
+    df = add_confidence_column(df)
+
+    # df["model_thinking_response"] = df["thinking_history"].apply(lambda history: history[1])
 
     if dataset == DatasetName.TimeTabling:
         # df = df[df["answer_count_bin"] < 3]  # easy
-        df = df[df["answer_count_bin"] > 7]  # hard
+        # df = df[df["answer_count_bin"] > 7]  # hard
         pass  # total
 
     df["overconfidence_rate"] = df["model_confidence_extracted"] - df["recall"]
 
+    df["model_thinking_response"] = df["thinking_history"].apply(lambda x: x[1])
     df["reflection_times"] = df["model_thinking_response"].apply(count_reflections)
     df["reflection_times_bin"] = df["reflection_times"].apply(lambda x: int(x // 5) if int(x // 5) < 9 else 9)
 
-    # 只保留数据量大于50的reflection_times_bin
+    # 只保留数据量大于100的reflection_times_bin
     df = df[
         df["reflection_times_bin"].isin(
-            df["reflection_times_bin"].value_counts()[df["reflection_times_bin"].value_counts() > 50].index
+            df["reflection_times_bin"].value_counts()[df["reflection_times_bin"].value_counts() > 100].index
         )
     ]
 
@@ -94,20 +96,27 @@ async def main():
     )
     df = df.merge(min_correct_reflection, on="question_id", how="left")
     df["reflection_times_norm"] = df["reflection_times"] - df["min_correct_reflection_times"]
-    grouped = df.groupby("reflection_times_norm")[["precision", "recall", "overconfidence_rate"]].mean().reset_index()
+    grouped = (
+        df.groupby("reflection_times_norm")[
+            ["precision", "recall", "model_confidence_extracted", "overconfidence_rate"]
+        ]
+        .mean()
+        .reset_index()
+    )
 
-    plt.figure(figsize=(15, 5))
-    for i, metric in enumerate(["precision", "recall", "overconfidence_rate"]):
+    plt.figure(figsize=(16, 4))
+    for i, metric in enumerate(["precision", "recall", "model_confidence_extracted", "overconfidence_rate"]):
         valid_df = df[["reflection_times_norm", metric]].dropna()
         corr, p = spearmanr(valid_df["reflection_times_norm"], valid_df[metric])
         significant = False if p >= 0.05 else True
-        plt.subplot(1, 3, i + 1)
+        plt.subplot(1, 4, i + 1)
         sns.lineplot(data=grouped, x="reflection_times_norm", y=metric, marker="o")
         plt.xlabel("Normalized Reflection Times")
         plt.ylabel(metric.capitalize())
         plt.title(
             f"{metric.capitalize()} vs Normalized Reflection Times\n"
-            f"Spearmanr Corr: {corr:.2f}, p: {p:.2g} {'(Significant)' if significant else '(Not Significant)'}"
+            f"Spearmanr Corr: {corr:.2f}\n"
+            f"p: {p:.2g} {'(Significant)' if significant else '(Not Significant)'}"
         )
     plt.tight_layout()
     plt.show()
