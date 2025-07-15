@@ -22,6 +22,7 @@ class Argument(Tap):
     dataset: DatasetName = DatasetName.TimeTabling
     template: Template = "simple"
     temperature: float = 0.2
+    max_completion_tokens: int = 20480
     force_update: bool = False
     concurrency: int = 100
     turn: int = 0
@@ -32,16 +33,17 @@ async def request(
     template: Template,
     data: Data,
     temperature: float,
+    max_completion_tokens: int = 20480,
 ) -> tuple[Data, Result[ChatResponse, str]]:
     response_result = await confidence.request(
-        model, data, template, temperature=temperature, max_completion_tokens=20480
+        model, data, template, temperature=temperature, max_completion_tokens=max_completion_tokens
     )
     return data, response_result
 
 
 async def main(args: Argument):
     record_cls = args.dataset.record_cls
-    title = f"{args.dataset}--{args.template}--{args.model}--{args.temperature}--{args.turn}"
+    title = f"{args.dataset}--{args.template}--{args.model}--{args.temperature}--{args.turn}".replace("/", "_")
     db_logger = Logger(db_name=title, table_name=title, record_cls=record_cls, force_update=args.force_update)
     async with db_logger:
         # ===== model =====
@@ -58,7 +60,14 @@ async def main(args: Argument):
 
         # ===== task =====
         tasks = [
-            request(model=model, template=args.template, data=data, temperature=args.temperature) for data in dataset
+            request(
+                model=model,
+                template=args.template,
+                data=data,
+                temperature=args.temperature,
+                max_completion_tokens=args.max_completion_tokens,
+            )
+            for data in dataset
         ]
         tasks = limit_concurrency(tasks, args.concurrency)
 

@@ -17,6 +17,10 @@ class ModelName(Enum):
     QWEN3_8B_NO_THINK = "qwen3-8b-no_think"
     QWEN3_32B_THINK = "qwen3-32b-think"
     QWEN3_32B_NO_THINK = "qwen3-32b-no_think"
+    DEEPSEEK_R1 = "DeepSeek-R1"
+    DEEPSEEK_V3 = "deepseek-ai/DeepSeek-V3"
+    GPT_4O_MINI = "gpt-4o-mini-2024-07-18"
+    O4_MINI = "o4-mini-2025-04-16"
 
     def __str__(self) -> str:
         return self.value
@@ -110,6 +114,21 @@ class Model:
                         + "</think>"
                         + response.choices[0].message.content
                     )
+                if self.model_name in [ModelName.DEEPSEEK_R1]:
+                    assert hasattr(response.choices[0].message, "reasoning_content"), (
+                        "Attribute `reasoning_content` not exists"
+                    )
+                    assert response.choices[0].message.reasoning_content is not None
+                    if response.choices[0].message.content is None:
+                        return Result(
+                            err="response.choices[0].message.content is None but reasoning_content is not None, consider increase max_new_tokens"
+                        )
+                    message_content = (
+                        response.choices[0].message.reasoning_content + "</think>" + response.choices[0].message.content
+                    )
+                if self.model_name in [ModelName.O4_MINI]:
+                    assert response.choices[0].message.content is not None
+                    message_content = "REASONING CONTENT NOT RETURN" + "</think>" + response.choices[0].message.content
                 else:
                     assert response.choices[0].message.content is not None
                     message_content = response.choices[0].message.content
