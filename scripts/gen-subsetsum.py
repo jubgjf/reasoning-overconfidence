@@ -236,7 +236,7 @@ if __name__ == "__main__":
                             ),  # Store params for potential regeneration/debugging
                             "problem_text": problem_text,
                             "num_solutions": num_solutions,
-                            # "solutions_data": solutions # Warning: can be large! Store only if needed.
+                            "solutions_data": solutions,  # Warning: can be large! Store only if needed.
                         }
                     )
                     generated_count += 1
@@ -271,6 +271,7 @@ if __name__ == "__main__":
                     question_id=question_id,
                     question=problem_data["problem_text"],
                     answer_count=problem_data["num_solutions"],
+                    answers={"0": str(problem_data["solutions_data"])},
                 )
                 question_id += 1
                 f.write(json.dumps(data.model_dump(), ensure_ascii=False) + "\n")

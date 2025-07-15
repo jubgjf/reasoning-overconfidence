@@ -102,17 +102,139 @@ def normalize_timetabling_solution(solution: dict[str, dict[str, str]]) -> str:
     return ";".join(solution_parts)
 
 
-def extract_all_solutions(s: str) -> set[str]:
+def extract_subsetsum_solutions(s: str) -> set[str]:
     """
-    通用的解决方案提取函数（目前只支持TimeTabling）
+    从模型生成的内容中提取SubsetSum任务的所有解决方案
 
     Args:
         s: 模型生成的字符串内容
 
     Returns:
+        set[str]: 包含所有解决方案的集合，每个解决方案表示为标准化字符串
+    """
+    solutions = set()
+
+    # 如果输入是Python列表格式（真实答案格式），直接解析
+    if s.strip().startswith('[[') and s.strip().endswith(']]'):
+        return parse_subsetsum_list_format(s)
+
+    # 匹配解决方案的模式，支持多种格式：
+    # 1. **Solution X:** {数字, 数字, ...}
+    # 2. Solution X: {数字, 数字, ...}
+    # 3. **Solution X:** `{数字, 数字, ...}`
+    solution_patterns = [
+        r"\*\*Solution\s+\d+:\*\*\s*\{([^}]+)\}",  # **Solution X:** {numbers}
+        r"\*\*Solution\s+\d+:\*\*\s*`\{([^}]+)\}`",  # **Solution X:** `{numbers}`
+        r"Solution\s+\d+:\s*\{([^}]+)\}",  # Solution X: {numbers}
+    ]
+
+    for pattern in solution_patterns:
+        solution_matches = re.finditer(pattern, s, re.IGNORECASE)
+        for match in solution_matches:
+            subset_content = match.group(1).strip()
+            
+            # 解析子集内容
+            solution = parse_subsetsum_solution(subset_content)
+            if solution is not None:
+                # 将解决方案转换为标准化字符串形式
+                normalized_solution = normalize_subsetsum_solution(solution)
+                solutions.add(normalized_solution)
+
+    return solutions
+
+
+def parse_subsetsum_list_format(s: str) -> set[str]:
+    """
+    解析Python列表格式的SubsetSum解决方案（真实答案格式）
+
+    Args:
+        s: 列表格式的字符串，例如 "[[24]]" 或 "[[16, 17, 18], [19, 20]]"
+
+    Returns:
+        set[str]: 标准化的解决方案集合
+    """
+    solutions = set()
+    try:
+        # 使用eval解析列表（注意：这在生产环境中不安全，但在这里是可控的）
+        import ast
+        solution_lists = ast.literal_eval(s)
+        
+        for solution_list in solution_lists:
+            if isinstance(solution_list, list):
+                solution_set = set(solution_list)
+                normalized_solution = normalize_subsetsum_solution(solution_set)
+                solutions.add(normalized_solution)
+    except (ValueError, SyntaxError):
+        pass
+    
+    return solutions
+
+
+def parse_subsetsum_solution(subset_content: str) -> set[int] | None:
+    """
+    解析子集内容，提取数字集合
+
+    Args:
+        subset_content: 子集内容字符串，例如 "1, 3, 5"
+
+    Returns:
+        set[int] | None: 数字集合，失败时返回None
+    """
+    try:
+        # 分割并清理数字
+        numbers = []
+        for num_str in subset_content.split(","):
+            num_str = num_str.strip()
+            if num_str:
+                numbers.append(int(num_str))
+
+        return set(numbers) if numbers else None
+    except ValueError:
+        return None
+
+
+def normalize_subsetsum_solution(solution: set[int]) -> str:
+    """
+    将解决方案标准化为字符串形式，便于去重和比较
+
+    Args:
+        solution: 数字集合
+
+    Returns:
+        str: 标准化的解决方案字符串
+    """
+    # 按数字大小排序，确保相同解决方案的字符串表示一致
+    sorted_numbers = sorted(solution)
+    return "{" + ",".join(map(str, sorted_numbers)) + "}"
+
+
+def extract_all_solutions(s: str, dataset: DatasetName | None = None) -> set[str]:
+    """
+    通用的解决方案提取函数，根据数据集类型选择合适的提取方法
+
+    Args:
+        s: 模型生成的字符串内容
+        dataset: 数据集类型，如果为None则尝试自动检测
+
+    Returns:
         set[str]: 包含所有解决方案的集合
     """
-    return extract_timetabling_solutions(s)
+    if dataset == DatasetName.TimeTabling:
+        return extract_timetabling_solutions(s)
+    elif dataset == DatasetName.SubsetSum:
+        return extract_subsetsum_solutions(s)
+    else:
+        # 如果未指定数据集类型，尝试两种方法并返回非空结果
+        timetabling_solutions = extract_timetabling_solutions(s)
+        subsetsum_solutions = extract_subsetsum_solutions(s)
+
+        # 优先返回有内容的结果
+        if timetabling_solutions:
+            return timetabling_solutions
+        elif subsetsum_solutions:
+            return subsetsum_solutions
+        else:
+            return set()
 
 
 def extract_total_count_from_text(s: str) -> int | None:
@@ -148,18 +270,19 @@ def extract_total_count_from_text(s: str) -> int | None:
     return None
 
 
-def compare_solution_counts(model_output: str) -> dict[str, int]:
+def compare_solution_counts(model_output: str, dataset: DatasetName | None = None) -> dict[str, int]:
     """
     比较模型声明的数量和实际提取的解决方案数量
 
     Args:
         model_output: 模型生成的字符串内容
+        dataset: 数据集类型
 
     Returns:
         dict[str, int]: 包含 'declared_count', 'extracted_count', 'unique_count' 的字典
     """
     declared_count = extract_total_count_from_text(model_output)
-    extracted_solutions = extract_all_solutions(model_output)
+    extracted_solutions = extract_all_solutions(model_output, dataset)
     unique_count = len(extracted_solutions)
 
     return {
@@ -221,7 +344,7 @@ def evaluate_count_prediction(ground_truth_count: int, model_output: str) -> dic
     """
     predicted_count = extract_predicted_count(model_output)
 
-    result = {
+    result: dict[str, int | bool | None | float] = {
         "ground_truth_count": ground_truth_count,
         "predicted_count": predicted_count,
         "count_available": predicted_count is not None,
@@ -261,7 +384,9 @@ def is_solution_changed(s: str) -> Result[bool, str]:
         return Result(err="Change status not found in the response")
 
 
-def compute_precision_recall(model_output: str, ground_truth_answers: str, answer_count: int) -> dict:
+def compute_precision_recall(
+    model_output: str, ground_truth_answers: str, answer_count: int, dataset: DatasetName | None = None
+) -> dict:
     """
     计算precision和recall
 
@@ -269,15 +394,16 @@ def compute_precision_recall(model_output: str, ground_truth_answers: str, answe
         model_output: 模型生成的输出
         ground_truth_answers: 真实答案
         answer_count: 真实答案总数
+        dataset: 数据集类型
 
     Returns:
         dict: 包含precision, recall, correct_solution_count, total_solution_count的字典
     """
     # 提取模型生成的解决方案
-    model_solutions = extract_all_solutions(model_output)
+    model_solutions = extract_all_solutions(model_output, dataset)
 
     # 提取真实答案中的解决方案
-    ground_truth_solutions = extract_all_solutions(ground_truth_answers)
+    ground_truth_solutions = extract_all_solutions(ground_truth_answers, dataset)
 
     # 计算正确的解决方案数量（交集）
     correct_solutions = model_solutions.intersection(ground_truth_solutions)
@@ -296,63 +422,6 @@ def compute_precision_recall(model_output: str, ground_truth_answers: str, answe
         "correct_solution_count": correct_solution_count,
         "total_solution_count": total_solution_count,
     }
-
-
-def prf_bf62eb6(df: pd.DataFrame, dataset: DatasetName) -> pd.DataFrame:
-    """
-    计算precision, recall和相关指标，使用后处理方法而非legacy数据库列
-
-    Args:
-        df: 包含model_thinking_response, model_answer_response, model_confidence_extracted(0~100)等列的DataFrame
-        dataset: 数据集类型
-
-    Returns:
-        pd.DataFrame: 添加了precision, recall等列的DataFrame
-    """
-    precision_list = []
-    recall_list = []
-    correct_solution_count_list = []
-    total_solution_count_list = []
-
-    for _, row in df.iterrows():
-        model_output = row["model_answer_response"]
-
-        # 获取真实答案
-        answers = row["answers"]
-        ground_truth_answers = answers.get("0", "") if isinstance(answers, dict) else ""
-        answer_count = row["answer_count"]
-
-        # 计算precision和recall
-        metrics = compute_precision_recall(model_output, ground_truth_answers, answer_count)
-
-        precision_list.append(metrics["precision"])
-        recall_list.append(metrics["recall"])
-        correct_solution_count_list.append(metrics["correct_solution_count"])
-        total_solution_count_list.append(metrics["total_solution_count"])
-
-    df["model_confidence_extracted"] = df["model_confidence_extracted"] / 100.0
-
-    # 添加计算结果到DataFrame
-    df = df.copy()
-    df["precision"] = precision_list
-    df["recall"] = recall_list
-    df["correct_solution_count"] = correct_solution_count_list
-    df["total_solution_count"] = total_solution_count_list
-
-    # 过滤无效数据
-    df = df[df["correct_solution_count"] <= df["total_solution_count"]]
-    df = df[df["correct_solution_count"] <= df["answer_count"]]
-    df = df[df["total_solution_count"] <= df["answer_count"]]
-
-    # 创建answer_count_bin
-    if dataset == DatasetName.TimeTabling:
-        df["answer_count_bin"] = df["answer_count"].apply(lambda x: int(x // 50))
-    elif dataset == DatasetName.SubsetSum:
-        df["answer_count_bin"] = df["answer_count"].apply(lambda x: int(x // 50) if int(x // 50) < 6 else 6)
-    else:
-        raise NotImplementedError
-
-    return df
 
 
 def prf(df: pd.DataFrame, dataset: DatasetName) -> pd.DataFrame:
@@ -390,7 +459,7 @@ def prf(df: pd.DataFrame, dataset: DatasetName) -> pd.DataFrame:
         answer_count = row["answer_count"]
 
         # 计算precision和recall
-        metrics = compute_precision_recall(model_output, ground_truth_answers, answer_count)
+        metrics = compute_precision_recall(model_output, ground_truth_answers, answer_count, dataset)
 
         precision_list.append(metrics["precision"])
         recall_list.append(metrics["recall"])
@@ -418,35 +487,6 @@ def prf(df: pd.DataFrame, dataset: DatasetName) -> pd.DataFrame:
         raise NotImplementedError
 
     return df
-
-
-def ece_bf62eb6(df: pd.DataFrame) -> float:
-    """
-    计算Expected Calibration Error (ECE)，使用从chat_history提取的置信度
-
-    Args:
-        df: 包含recall等列的DataFrame
-
-    Returns:
-        float: ECE值
-    """
-
-    # 计算ECE
-    # 注意：置信度是0-100范围，需要归一化到0-1
-    confidence_normalized = df["model_confidence_extracted"]
-    bins = [i / 10.0 for i in range(11)]  # [0.0, 0.1, 0.2, ..., 1.0]
-    df["bin"] = pd.cut(confidence_normalized, bins=bins, include_lowest=True, labels=False)
-    ece = 0
-    N = len(df)
-
-    for b in range(10):
-        bin_data = df[df["bin"] == b]
-        if len(bin_data) == 0:
-            continue
-        acc = (bin_data["recall"] == 1).mean()  # 或用 precision
-        conf = confidence_normalized[bin_data.index].mean()
-        ece += len(bin_data) / N * abs(acc - conf)
-    return ece
 
 
 def ece(df: pd.DataFrame) -> float:
@@ -514,7 +554,6 @@ def show_metrics(df: pd.DataFrame, setting_name: str):
         "Precision": df["precision"].mean(),
         "Recall": df["recall"].mean(),
         "ECE(r)": ece(df),
-        # "ECE(r)": ece_bf62eb6(df),
     }
     print(",".join(metrics.keys()))
     print(",".join(f"{value * 100:.2f}" for value in metrics.values()))

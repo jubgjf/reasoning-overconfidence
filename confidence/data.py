@@ -47,6 +47,7 @@ class TimeTablingData(BaseModel):
 class SubsetSumData(BaseModel):
     question_id: int
     question: str
+    answers: dict[str, str]
     answer_count: int
 
     def ask_for_solve(self, template_name: Template) -> str:
