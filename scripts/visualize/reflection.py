@@ -3,7 +3,7 @@ import re
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
-from scipy.stats import mannwhitneyu, spearmanr
+from scipy.stats import spearmanr
 from tortoise import run_async
 
 from confidence.dataset import DatasetName
@@ -106,19 +106,26 @@ async def main():
 
     plt.figure(figsize=(16, 4))
     for i, metric in enumerate(["precision", "recall", "model_confidence_extracted", "overconfidence_rate"]):
+        if metric == "precision":
+            ylabel = "Precision"
+        elif metric == "recall":
+            ylabel = "Recall"
+        elif metric == "model_confidence_extracted":
+            ylabel = "Confidence"
+        elif metric == "overconfidence_rate":
+            ylabel = "Confidence - Recall"
+        else:
+            raise ValueError(f"Unknown metric: {metric}")
         valid_df = df[["reflection_times_norm", metric]].dropna()
         corr, p = spearmanr(valid_df["reflection_times_norm"], valid_df[metric])
         significant = False if p >= 0.05 else True
         plt.subplot(1, 4, i + 1)
         sns.lineplot(data=grouped, x="reflection_times_norm", y=metric, marker="o")
         plt.xlabel("Normalized Reflection Times")
-        plt.ylabel(metric.capitalize())
-        plt.title(
-            f"{metric.capitalize()} vs Normalized Reflection Times\n"
-            f"Spearmanr Corr: {corr:.2f}\n"
-            f"p: {p:.2g} {'(Significant)' if significant else '(Not Significant)'}"
-        )
+        plt.ylabel(ylabel)
+        plt.title(f"Spearmanr Corr: {corr:.2f}\np: {p:.2g} {'(Significant)' if significant else '(Not Significant)'}")
     plt.tight_layout()
+    plt.savefig(f"figures/reflection-qwen-{dataset}.pdf")
     plt.show()
 
 

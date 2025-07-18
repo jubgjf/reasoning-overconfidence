@@ -18,6 +18,7 @@ class Setting(BaseModel):
 
 
 async def main():
+    # dataset = DatasetName.SubsetSum
     dataset = DatasetName.TimeTabling
     turn = 0
     temperature = 0.2
@@ -26,23 +27,27 @@ async def main():
         Setting(model=ModelName.QWEN3_8B_THINK, template="simple", mode=""),
         Setting(model=ModelName.QWEN3_8B_NO_THINK, template="cot", mode=""),
         Setting(model=ModelName.QWEN3_8B_NO_THINK, template="cot", mode="--more"),
+        # Setting(model=ModelName.DEEPSEEK_R1, template="simple", mode=""),
+        # Setting(model=ModelName.DEEPSEEK_V3, template="cot", mode=""),
+        # Setting(model=ModelName.O4_MINI, template="simple",mode=""),
+        # Setting(model=ModelName.GPT_4O_MINI, template="cot",mode=""),
     ]
 
     for setting in settings:
         record_cls = dataset.record_cls
-        title = f"{dataset}--{setting.template}--{setting.model}--{temperature}--{turn}{setting.mode}"
+        title = f"{dataset}--{setting.template}--{setting.model}--{temperature}--{turn}{setting.mode}".replace("/", "_")
         db_logger = Logger(db_name=title, table_name=title, record_cls=record_cls)
         async with db_logger:
             records = await db_logger.fetch()
 
         method_records = [record.model_dump() for record in records]
         df = pd.DataFrame(method_records)
-        if setting.model == ModelName.QWEN3_8B_NO_THINK and setting.template == "cot":
+        if setting.template == "cot":
             if setting.mode == "":
                 df["setting"] = "Short-CoT"
             else:
                 df["setting"] = "Short-CoT-Explore"
-        elif setting.model == ModelName.QWEN3_8B_THINK and setting.template == "simple":
+        elif setting.template == "simple":
             df["setting"] = "Long-CoT"
         else:
             raise ValueError(f"Unknown setting: {setting.model}--{setting.template}")
@@ -180,20 +185,23 @@ async def main():
         avg_answer_count = sum(int(ac) for ac in answer_counts) / len(answer_counts) if answer_counts else 0.0
 
         # 打印结果
-        print(f"\n=== {df['setting'].iloc[0]} ===")
-        print(f"样本数量: {total_samples}")
-        print(f"解空间总大小（平均）: {avg_answer_count:.2f}")
-        print("\n--- 中间指标 ---")
-        print(f"第一轮正确解数量（平均）: {avg_first_round_correct:.2f}")
-        print(f"第二轮正确解数量（平均）: {avg_second_round_correct:.2f}")
-        print(f"两轮正确解交集大小（平均）: {avg_intersection_correct:.2f}")
-        print(f"第一轮错误解数量（平均）: {avg_first_round_error:.2f}")
-        print(f"第二轮错误解数量（平均）: {avg_second_round_error:.2f}")
-        print(f"两轮错误解交集大小（平均）: {avg_intersection_error:.2f}")
-        print("\n--- 主要指标 ---")
-        print(f"正解保留率: {avg_correct_preservation:.4f}")
-        print(f"错误修正率: {avg_error_correction:.4f}")
-        print(f"新解发现率: {avg_new_solution_discovery:.4f}")
+        # print(f"\n=== {df['setting'].iloc[0]} ===")
+        # print(f"样本数量: {total_samples}")
+        # print(f"解空间总大小（平均）: {avg_answer_count:.2f}")
+        # print("\n--- 中间指标 ---")
+        # print(f"第一轮正确解数量（平均）: {avg_first_round_correct:.2f}")
+        # print(f"第二轮正确解数量（平均）: {avg_second_round_correct:.2f}")
+        # print(f"两轮正确解交集大小（平均）: {avg_intersection_correct:.2f}")
+        # print(f"第一轮错误解数量（平均）: {avg_first_round_error:.2f}")
+        # print(f"第二轮错误解数量（平均）: {avg_second_round_error:.2f}")
+        # print(f"两轮错误解交集大小（平均）: {avg_intersection_error:.2f}")
+        # print("\n--- 主要指标 ---")
+        # print(f"正解保留率: {avg_correct_preservation:.4f}")
+        # print(f"错误修正率: {avg_error_correction:.4f}")
+        # print(f"新解发现率: {avg_new_solution_discovery:.4f}")
+        print(
+            f"{avg_correct_preservation * 100:.2f} {avg_error_correction * 100:.2f} {avg_new_solution_discovery * 100:.2f}"
+        )
 
 
 if __name__ == "__main__":

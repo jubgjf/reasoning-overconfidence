@@ -489,56 +489,63 @@ def prf(df: pd.DataFrame, dataset: DatasetName) -> pd.DataFrame:
     return df
 
 
-def ece(df: pd.DataFrame) -> float:
+def ece(df: pd.DataFrame, metric_column: str = "recall") -> float:
     """
-    计算Expected Calibration Error (ECE)，使用从chat_history提取的置信度
-
+    计算Expected Calibration Error (ECE)，使用已提取的model_confidence_extracted列
+    
     Args:
-        df: 包含chat_history, recall等列的DataFrame
-
+        df: 包含model_confidence_extracted和指定metric列的DataFrame
+        metric_column: 用于计算准确率的列名 ('precision' 或 'recall')
+    
     Returns:
         float: ECE值
     """
-    # 提取置信度
-    confidence_list = []
-    valid_indices = []
-
-    for idx, (_, row) in enumerate(df.iterrows()):
-        chat_history = row["chat_history"]
-        if len(chat_history) < 2:
-            continue
-
-        # 从第二个消息中提取置信度（索引1）
-        content = chat_history[3]["content"]
-        confidence_result = extract_confidence(content)
-
-        if confidence_result.ok is not None:
-            confidence_list.append(confidence_result.ok)
-            valid_indices.append(idx)
-
-    if not confidence_list:
+    if "model_confidence_extracted" not in df.columns:
+        raise ValueError("DataFrame must contain 'model_confidence_extracted' column")
+    
+    if metric_column not in df.columns:
+        raise ValueError(f"DataFrame must contain '{metric_column}' column")
+    
+    # 过滤掉置信度为空的行
+    valid_df = df.dropna(subset=["model_confidence_extracted"]).copy()
+    
+    if len(valid_df) == 0:
         return 0.0
-
-    # 创建只包含有效置信度的子DataFrame
-    valid_df = df.iloc[valid_indices].copy()
-    valid_df["model_confidence_extracted"] = confidence_list
-
-    # 计算ECE
-    # 注意：置信度是0-100范围，需要归一化到0-1
+    
+    # 计算ECE - 使用与原ece函数相同的逻辑
     confidence_normalized = valid_df["model_confidence_extracted"]
     bins = [i / 10.0 for i in range(11)]  # [0.0, 0.1, 0.2, ..., 1.0]
     valid_df["bin"] = pd.cut(confidence_normalized, bins=bins, include_lowest=True, labels=False)
-    ece = 0
+    ece_value = 0
     N = len(valid_df)
-
+    
     for b in range(10):
         bin_data = valid_df[valid_df["bin"] == b]
         if len(bin_data) == 0:
             continue
-        acc = (bin_data["recall"] == 1).mean()  # 或用 precision
+        acc = (bin_data[metric_column] == 1).mean()
         conf = confidence_normalized[bin_data.index].mean()
-        ece += len(bin_data) / N * abs(acc - conf)
-    return ece
+        ece_value += len(bin_data) / N * abs(acc - conf)
+    
+    return ece_value
+
+
+def ece_by_groups(df: pd.DataFrame, group_column: str, metric_column: str = "recall") -> dict[str, float]:
+    """
+    按组计算ECE值
+    
+    Args:
+        df: 包含model_confidence_extracted和指定metric列的DataFrame
+        group_column: 用于分组的列名
+        metric_column: 用于计算准确率的列名 ('precision' 或 'recall')
+    
+    Returns:
+        dict[str, float]: 每个组的ECE值
+    """
+    ece_dict = {}
+    for group_name, group_data in df.groupby(group_column):
+        ece_dict[group_name] = ece(group_data, metric_column)
+    return ece_dict
 
 
 def show_metrics(df: pd.DataFrame, setting_name: str):

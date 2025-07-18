@@ -1,62 +1,82 @@
 import pandas as pd
 import seaborn as sns
 from matplotlib import pyplot as plt
-from pydantic import BaseModel
 from tortoise import run_async
 
 from confidence.dataset import DatasetName
+from confidence.evaluate import add_confidence_column, prf
 from confidence.logger import Logger
 from confidence.model import ModelName
-from confidence.evaluate import prf, add_confidence_column
-from confidence.data import Template
-
-
-class Setting(BaseModel):
-    model: ModelName
-    template: Template
 
 
 async def main():
-    dataset = DatasetName.TimeTabling
     model = ModelName.QWEN3_8B_NO_THINK
     template = "cot"
     turn = 0
 
+    # 定义两个数据集的实验设置
+    datasets = [DatasetName.SubsetSum, DatasetName.TimeTabling]
+
     records_list = []
-    for temperature in [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]:
-        record_cls = dataset.record_cls
-        title = f"{dataset}--{template}--{model}--{temperature}--{turn}"
-        db_logger = Logger(db_name=title, table_name=title, record_cls=record_cls)
-        async with db_logger:
-            records = await db_logger.fetch()
-        method_records = [record.model_dump() for record in records]
-        df = pd.DataFrame(method_records)
-        df["temperature"] = temperature
-        records_list.append(df)
+    for dataset in datasets:
+        for temperature in [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]:
+            record_cls = dataset.record_cls
+            title = f"{dataset}--{template}--{model}--{temperature}--{turn}"
+            db_logger = Logger(db_name=title, table_name=title, record_cls=record_cls)
+            async with db_logger:
+                records = await db_logger.fetch()
+            method_records = [record.model_dump() for record in records]
+            df = pd.DataFrame(method_records)
+            df["temperature"] = temperature
+
+            # 添加数据集标识
+            if dataset == DatasetName.TimeTabling:
+                df["dataset"] = "TimeTabling"
+            else:
+                df["dataset"] = "SubsetSum"
+
+            # 计算指标
+            df = prf(df, dataset)
+            df = add_confidence_column(df)
+
+            records_list.append(df)
+
     df = pd.concat(records_list, ignore_index=True)
 
-    df = prf(df, dataset)
-    df = add_confidence_column(df)
-
+    # 绘制 Precision vs Temperature
     plt.figure()
-    sns.scatterplot(df, x="temperature", y="precision")
-    sns.lineplot(df, x="temperature", y="precision")
-    plt.xlabel("temperature")
-    plt.ylabel("precision")
+    # sns.scatterplot(data=df, x="temperature", y="precision", hue="dataset", s=50)
+    sns.lineplot(data=df, x="temperature", y="precision", hue="dataset", marker="o")
+    plt.xlabel("Temperature")
+    plt.ylabel("Precision")
+    # plt.title("Precision vs Temperature")
+    plt.legend(title="Dataset")
+    plt.grid(True, alpha=0.3)
+    plt.savefig("figures/temperature-qwen-precision.pdf")
     plt.show()
 
+    # 绘制 Recall vs Temperature
     plt.figure()
-    sns.scatterplot(df, x="temperature", y="recall")
-    sns.lineplot(df, x="temperature", y="recall")
-    plt.xlabel("temperature")
-    plt.ylabel("recall")
+    # sns.scatterplot(data=df, x="temperature", y="recall", hue="dataset", s=50)
+    sns.lineplot(data=df, x="temperature", y="recall", hue="dataset", marker="o")
+    plt.xlabel("Temperature")
+    plt.ylabel("Recall")
+    # plt.title("Recall vs Temperature")
+    plt.legend(title="Dataset")
+    plt.grid(True, alpha=0.3)
+    plt.savefig("figures/temperature-qwen-recall.pdf")
     plt.show()
 
+    # 绘制 Model Confidence vs Temperature
     plt.figure()
-    sns.scatterplot(df, x="temperature", y="model_confidence_extracted")
-    sns.lineplot(df, x="temperature", y="model_confidence_extracted")
-    plt.xlabel("temperature")
-    plt.ylabel("model_confidence_extracted")
+    # sns.scatterplot(data=df, x="temperature", y="model_confidence_extracted", hue="dataset", s=50)
+    sns.lineplot(data=df, x="temperature", y="model_confidence_extracted", hue="dataset", marker="o")
+    plt.xlabel("Temperature")
+    plt.ylabel("Model Confidence")
+    # plt.title("Model Confidence vs Temperature")
+    plt.legend(title="Dataset")
+    plt.grid(True, alpha=0.3)
+    plt.savefig("figures/temperature-qwen-confidence.pdf")
     plt.show()
 
 

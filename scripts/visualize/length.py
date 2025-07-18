@@ -43,7 +43,7 @@ async def main():
     df["model_thinking_response"] = df["thinking_history"].apply(lambda x: x[1])
     df["model_thinking_length"] = df["model_thinking_response"].apply(lambda x: len(tokenizer.encode(x)))
 
-    plt.figure()
+    plt.figure(figsize=(6, 3))
     df["length_bin"] = pd.cut(df["model_thinking_length"], bins=10, include_lowest=True)
     length_grouped = df.groupby("length_bin", observed=False)["model_confidence_extracted"].mean().reset_index()
     length_grouped["length_center"] = length_grouped["length_bin"].apply(lambda x: x.mid)
@@ -84,13 +84,13 @@ async def main():
         "--",
         color="red",
         linewidth=2,
-        label=f"Log-linear fit (slope={coeffs[0]:.3f}, r={corr_coefficient:.3f}, R²={r_squared:.3f}, p={p_value:.3f}, {significant})",
+        label=f"Log-linear fit (Pearson Corr={corr_coefficient:.3f})",
     )
 
     plt.xscale("log")
     plt.xlabel("Model Thinking Length (tokens)")
     plt.ylabel("Model Confidence")
-    plt.title("Thinking Length vs Confidence with Linear Fit")
+    # plt.title("Thinking Length vs Confidence with Linear Fit")
     plt.legend(loc="best")
 
     # 打印统计结果
@@ -101,8 +101,8 @@ async def main():
     print(f"  Significance: {significant}")
     print(f"  Slope in log space: {coeffs[0]:.3f}")
 
-    plt.grid(True, alpha=0.3)
     plt.tight_layout()
+    plt.savefig(f"figures/length-qwen-{dataset}.pdf")
     plt.show()
 
 

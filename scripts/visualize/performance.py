@@ -19,6 +19,7 @@ class Setting(BaseModel):
 
 
 async def main():
+    # dataset = DatasetName.SubsetSum
     dataset = DatasetName.TimeTabling
     turn = 0
     temperature = 0.2
@@ -26,12 +27,16 @@ async def main():
     settings = [
         Setting(model=ModelName.QWEN3_8B_THINK, template="simple"),
         Setting(model=ModelName.QWEN3_8B_NO_THINK, template="cot"),
+        # Setting(model=ModelName.DEEPSEEK_R1, template="simple"),
+        # Setting(model=ModelName.DEEPSEEK_V3, template="cot"),
+        # Setting(model=ModelName.O4_MINI, template="simple"),
+        # Setting(model=ModelName.GPT_4O_MINI, template="cot"),
     ]
 
     records_list = []
     for setting in settings:
         record_cls = dataset.record_cls
-        title = f"{dataset}--{setting.template}--{setting.model}--{temperature}--{turn}"
+        title = f"{dataset}--{setting.template}--{setting.model}--{temperature}--{turn}".replace("/", "_")
         db_logger = Logger(db_name=title, table_name=title, record_cls=record_cls)
         async with db_logger:
             records = await db_logger.fetch()
@@ -43,9 +48,9 @@ async def main():
         df = prf(df, dataset)
         df = add_confidence_column(df)
 
-        if setting.model == ModelName.QWEN3_8B_NO_THINK and setting.template == "cot":
+        if setting.template == "cot":
             df["setting"] = "Short-CoT"
-        elif setting.model == ModelName.QWEN3_8B_THINK and setting.template == "simple":
+        elif setting.template == "simple":
             df["setting"] = "Long-CoT"
         else:
             raise ValueError(f"Unknown setting: {setting.model}--{setting.template}")
@@ -135,9 +140,10 @@ async def main():
     g.ax_joint.set_xlim(-0.02, 1.02)
     g.ax_joint.set_ylim(-0.02, 1.02)
     g.ax_joint.legend(title="Setting")
-    plt.show()
+    plt.savefig(f"figures/performance-2d-qwen-{dataset}-recall.pdf")
+    # plt.show()
 
-    fig = plt.figure(figsize=(8, 6))
+    fig = plt.figure(figsize=(6, 4))
     ax = fig.add_subplot(111, projection="3d")
 
     for setting, color in palette.items():
@@ -159,9 +165,10 @@ async def main():
     ax.set_xlim(-0.05, 1.05)
     ax.set_ylim(-0.05, 1.05)
     ax.legend(title="Setting")
-    ax.set_title("3D Scatter: Confidence vs Recall vs Density")  # 改为 ax.set_title
+    # ax.set_title("3D Scatter: Confidence vs Recall vs Density")  # 改为 ax.set_title
     plt.tight_layout()
-    plt.show()
+    plt.savefig(f"figures/performance-3d-qwen-{dataset}-recall.pdf")
+    # plt.show()
 
     # 1. 构建网格
     x_min, x_max = df["model_confidence_extracted"].min(), df["model_confidence_extracted"].max()
@@ -202,7 +209,7 @@ async def main():
             V.ravel()[i] = mean_vec[1]
 
     # 5. 绘制
-    plt.figure(figsize=(8, 7))
+    plt.figure(figsize=(6, 4))
     plt.scatter(short_points[:, 0], short_points[:, 1], c="tab:orange", alpha=0.1, label="Short-CoT")
     plt.scatter(long_points[:, 0], long_points[:, 1], c="tab:blue", alpha=0.1, label="Long-CoT")
     plt.quiver(xx, yy, U, V, angles="xy", scale_units="xy", scale=1.5, color="gray", width=0.005, alpha=1.0)
@@ -211,9 +218,10 @@ async def main():
     plt.xlim(x_min - 0.02, x_max + 0.02)
     plt.ylim(y_min - 0.02, y_max + 0.02)
     plt.legend()
-    plt.title("2D Short-CoT to Long-CoT Movement Field")
+    # plt.title("2D Short-CoT to Long-CoT Movement Field")
     plt.tight_layout()
-    plt.show()
+    plt.savefig(f"figures/performance-movement-qwen-{dataset}-recall.pdf")
+    # plt.show()
 
     # ============================ PRECISION ============================
 
@@ -284,9 +292,10 @@ async def main():
     g.ax_joint.set_xlim(-0.02, 1.02)
     g.ax_joint.set_ylim(-0.02, 1.02)
     g.ax_joint.legend(title="Setting")
-    plt.show()
+    plt.savefig(f"figures/performance-2d-qwen-{dataset}-precision.pdf")
+    # plt.show()
 
-    fig = plt.figure(figsize=(8, 6))
+    plt.figure(figsize=(6, 4))
     ax = fig.add_subplot(111, projection="3d")
 
     for setting, color in palette.items():
@@ -308,9 +317,10 @@ async def main():
     ax.set_xlim(-0.05, 1.05)
     ax.set_ylim(-0.05, 1.05)
     ax.legend(title="Setting")
-    ax.set_title("3D Scatter: Confidence vs Precision vs Density")  # 改为 ax.set_title
+    # ax.set_title("3D Scatter: Confidence vs Precision vs Density")  # 改为 ax.set_title
     plt.tight_layout()
-    plt.show()
+    plt.savefig(f"figures/performance-3d-qwen-{dataset}-precision.pdf")
+    # plt.show()
 
     # 1. 构建网格
     x_min, x_max = df["model_confidence_extracted"].min(), df["model_confidence_extracted"].max()
@@ -351,7 +361,7 @@ async def main():
             V.ravel()[i] = mean_vec[1]
 
     # 5. 绘制
-    plt.figure(figsize=(8, 7))
+    plt.figure(figsize=(6, 4))
     plt.scatter(short_points[:, 0], short_points[:, 1], c="tab:orange", alpha=0.1, label="Short-CoT")
     plt.scatter(long_points[:, 0], long_points[:, 1], c="tab:blue", alpha=0.1, label="Long-CoT")
     plt.quiver(xx, yy, U, V, angles="xy", scale_units="xy", scale=1.5, color="gray", width=0.005, alpha=1.0)
@@ -360,9 +370,10 @@ async def main():
     plt.xlim(x_min - 0.02, x_max + 0.02)
     plt.ylim(y_min - 0.02, y_max + 0.02)
     plt.legend()
-    plt.title("2D Short-CoT to Long-CoT Movement Field")
+    # plt.title("2D Short-CoT to Long-CoT Movement Field")
     plt.tight_layout()
-    plt.show()
+    plt.savefig(f"figures/performance-movement-qwen-{dataset}-precision.pdf")
+    # plt.show()
 
 
 if __name__ == "__main__":
