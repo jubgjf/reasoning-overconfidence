@@ -28,9 +28,9 @@ async def request(
     turn 2: Let model think again
     """
 
-    if model.model_name in [ModelName.QWEN3_8B_THINK, ModelName.QWEN3_32B_THINK]:
+    if model.model_name in [ModelName.QWEN3_8B_THINK]:
         suffix = " /think"
-    elif model.model_name in [ModelName.QWEN3_8B_NO_THINK, ModelName.QWEN3_32B_NO_THINK]:
+    elif model.model_name in [ModelName.QWEN3_8B_NO_THINK]:
         suffix = " /no_think"
     else:
         suffix = ""
@@ -115,9 +115,9 @@ async def _request_fake_reflection(
     turn_0_model_output = prompt.split("<|im_start|>assistant\n")[-1] + response_result.ok_value
     turn_0_thinking_content, turn_0_answer_content = split_thinking_answer(turn_0_model_output)
 
-    if model.model_name in [ModelName.QWEN3_8B_THINK, ModelName.QWEN3_32B_THINK]:
+    if model.model_name in [ModelName.QWEN3_8B_THINK]:
         suffix = " /think"
-    elif model.model_name in [ModelName.QWEN3_8B_NO_THINK, ModelName.QWEN3_32B_NO_THINK]:
+    elif model.model_name in [ModelName.QWEN3_8B_NO_THINK]:
         suffix = " /no_think"
     else:
         suffix = ""
@@ -165,7 +165,7 @@ async def _request_fake_reflection(
         return Result(err=err_message)
 
     assert len(response_result.ok_value.messages) == 6  # Total 3 turns, each turn has 2 messages (user and assistant)
-    if model.model_name in [ModelName.QWEN3_8B_THINK, ModelName.QWEN3_32B_THINK]:
+    if model.model_name in [ModelName.QWEN3_8B_THINK]:
         if turn_0_thinking_content == "":
             return Result(err="turn_0_thinking_content is empty")
         if response_result.ok_value.thinking is None:
@@ -205,7 +205,7 @@ def build_less_reflection_requests(
     turn 2: Let model think again             <- delete and chat again
     """
 
-    assert model.model_name in [ModelName.QWEN3_8B_THINK, ModelName.QWEN3_32B_THINK], "Only support Long-CoT model"
+    assert model.model_name in [ModelName.QWEN3_8B_THINK], "Only support Long-CoT model"
 
     messages = deepcopy(chat_history)
     messages = messages[:2]
@@ -284,7 +284,7 @@ def build_more_reflection_requests(
     turn 2: Let model think again             <- delete and chat again
     """
 
-    assert model.model_name not in [ModelName.QWEN3_8B_THINK, ModelName.QWEN3_32B_THINK], "Not support Long-CoT model"
+    assert model.model_name not in [ModelName.QWEN3_8B_THINK], "Not support Long-CoT model"
 
     messages = deepcopy(chat_history)
     messages = messages[:2]

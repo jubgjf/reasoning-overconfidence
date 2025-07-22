@@ -1,4 +1,5 @@
 import asyncio
+import io
 import os
 from enum import Enum
 
@@ -15,10 +16,8 @@ from confidence.utils import split_thinking_answer
 class ModelName(Enum):
     QWEN3_8B_THINK = "qwen3-8b-think"
     QWEN3_8B_NO_THINK = "qwen3-8b-no_think"
-    QWEN3_32B_THINK = "qwen3-32b-think"
-    QWEN3_32B_NO_THINK = "qwen3-32b-no_think"
-    DEEPSEEK_R1 = "DeepSeek-R1"
-    DEEPSEEK_V3 = "deepseek-ai/DeepSeek-V3"
+    DEEPSEEK_R1 = "DeepSeekR1INT8"
+    DEEPSEEK_V3 = "DeepSeekV3"
     GPT_4O_MINI = "gpt-4o-mini-2024-07-18"
     O4_MINI = "o4-mini-2025-04-16"
 
@@ -101,8 +100,9 @@ class Model:
                     messages=messages_no_placeholder,
                     temperature=temperature,
                     max_completion_tokens=max_completion_tokens,
+                    stream=self.model_name in [ModelName.DEEPSEEK_R1],
                 )
-                if self.model_name in [ModelName.QWEN3_8B_THINK, ModelName.QWEN3_32B_THINK]:
+                if self.model_name in [ModelName.QWEN3_8B_THINK]:
                     assert response.choices[0].message.model_extra is not None
                     assert response.choices[0].message.model_extra["reasoning_content"] is not None
                     if response.choices[0].message.content is None:
@@ -114,19 +114,21 @@ class Model:
                         + "</think>"
                         + response.choices[0].message.content
                     )
-                if self.model_name in [ModelName.DEEPSEEK_R1]:
-                    assert hasattr(response.choices[0].message, "reasoning_content"), (
-                        "Attribute `reasoning_content` not exists"
-                    )
-                    assert response.choices[0].message.reasoning_content is not None
-                    if response.choices[0].message.content is None:
-                        return Result(
-                            err="response.choices[0].message.content is None but reasoning_content is not None, consider increase max_new_tokens"
-                        )
-                    message_content = (
-                        response.choices[0].message.reasoning_content + "</think>" + response.choices[0].message.content
-                    )
-                if self.model_name in [ModelName.O4_MINI]:
+                elif self.model_name in [ModelName.DEEPSEEK_R1]:
+                    # Wired, but `timeout` in AsyncOpenAI is not working
+                    # DeepSeek-R1 API is slow, so we use streaming to keep the connection alive
+                    buffer = io.StringIO()
+                    async for chunk in response:
+                        if chunk.choices[0].delta.content:
+                            chunk_content = chunk.choices[0].delta.content
+                            # print(chunk_content, end="", flush=True)
+                            buffer.write(chunk_content)
+                    full_response = buffer.getvalue()
+                    buffer.close()
+                    if "</think>" not in full_response:
+                        return Result(err="</think> not found in response")
+                    message_content = full_response
+                elif self.model_name in [ModelName.O4_MINI]:
                     assert response.choices[0].message.content is not None
                     message_content = "REASONING CONTENT NOT RETURN" + "</think>" + response.choices[0].message.content
                 else:
