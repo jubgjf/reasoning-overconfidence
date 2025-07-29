@@ -19,6 +19,15 @@ class DatasetName(Enum):
         return self.value
 
     @property
+    def name(self) -> str:
+        if self == DatasetName.TimeTabling:
+            return "TimeTabling"
+        elif self == DatasetName.SubsetSum:
+            return "SubsetSum"
+        else:
+            raise ValueError(f"Unknown dataset name: {self}")
+
+    @property
     def record_cls(self) -> Type[Record]:
         record_cls_map = {
             DatasetName.TimeTabling: TimeTablingRecord,

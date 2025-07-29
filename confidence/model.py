@@ -28,6 +28,17 @@ class ModelName(Enum):
     def model_id(self) -> str:
         return self.value
 
+    @property
+    def series_name(self) -> str:
+        if self in [ModelName.QWEN3_8B_THINK, ModelName.QWEN3_8B_NO_THINK]:
+            return "Qwen"
+        elif self in [ModelName.DEEPSEEK_R1, ModelName.DEEPSEEK_V3]:
+            return "DeepSeek"
+        elif self in [ModelName.O4_MINI, ModelName.GPT_4O_MINI]:
+            return "GPT"
+        else:
+            raise ValueError(f"Unknown model name: {self}")
+
 
 class ChatResponse(BaseModel):
     messages: list[dict[str, str]]

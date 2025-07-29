@@ -7,7 +7,7 @@ from tortoise import run_async
 from transformers import AutoTokenizer
 
 from confidence.dataset import DatasetName
-from confidence.evaluate import prf, add_confidence_column
+from confidence.evaluate import add_confidence_column, prf
 from confidence.logger import Logger
 from confidence.model import ModelName
 
@@ -88,6 +88,24 @@ async def main():
     )
 
     plt.xscale("log")
+
+    # 设置更规律的x轴刻度 - 使用科学计数法格式
+    x_min, x_max = length_grouped["length_center"].min(), length_grouped["length_center"].max()
+    # 计算合适的数量级范围
+    log_min, log_max = np.log10(x_min), np.log10(x_max)
+
+    # 生成规律的刻度位置：1, 2, 5, 10, 20, 50, 100, ...
+    tick_positions = []
+    for exp in range(int(log_min), int(log_max) + 2):
+        for base in [1, 2, 5]:
+            tick_val = base * (10**exp)
+            if x_min <= tick_val <= x_max * 1.5:  # 稍微扩展范围以包含边界值
+                tick_positions.append(tick_val)
+
+    tick_positions = sorted(list(set(tick_positions)))  # 去重并排序
+
+    plt.xticks(tick_positions, [f"{x / 1000:.1f}×10³" if x >= 1000 else f"{int(x)}" for x in tick_positions])
+
     plt.xlabel("Model Thinking Length (tokens)")
     plt.ylabel("Model Confidence")
     # plt.title("Thinking Length vs Confidence with Linear Fit")
@@ -102,8 +120,8 @@ async def main():
     print(f"  Slope in log space: {coeffs[0]:.3f}")
 
     plt.tight_layout()
-    plt.savefig(f"figures/length-qwen-{dataset}.pdf")
-    plt.show()
+    plt.savefig(f"figures/length-{model.series_name.lower()}-{dataset}.pdf")
+    # plt.show()
 
 
 if __name__ == "__main__":

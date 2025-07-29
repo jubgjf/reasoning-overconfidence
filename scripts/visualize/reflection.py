@@ -7,7 +7,7 @@ from scipy.stats import spearmanr
 from tortoise import run_async
 
 from confidence.dataset import DatasetName
-from confidence.evaluate import add_confidence_column, prf
+from confidence.evaluate import add_confidence_column, ece, prf
 from confidence.logger import Logger
 from confidence.model import ModelName
 
@@ -47,7 +47,7 @@ def count_reflections(history_thinking_content: str) -> int:
 async def main():
     model = ModelName.QWEN3_8B_THINK
     template = "simple"
-    dataset = DatasetName.TimeTabling
+    dataset = DatasetName.SubsetSum
     turn = 0
     temperature = 0.2
 
@@ -70,15 +70,6 @@ async def main():
     df = prf(df, dataset)
     df = add_confidence_column(df)
 
-    # df["model_thinking_response"] = df["thinking_history"].apply(lambda history: history[1])
-
-    if dataset == DatasetName.TimeTabling:
-        # df = df[df["answer_count_bin"] < 3]  # easy
-        # df = df[df["answer_count_bin"] > 7]  # hard
-        pass  # total
-
-    df["overconfidence_rate"] = df["model_confidence_extracted"] - df["recall"]
-
     df["model_thinking_response"] = df["thinking_history"].apply(lambda x: x[1])
     df["reflection_times"] = df["model_thinking_response"].apply(count_reflections)
     df["reflection_times_bin"] = df["reflection_times"].apply(lambda x: int(x // 5) if int(x // 5) < 9 else 9)
@@ -96,36 +87,64 @@ async def main():
     )
     df = df.merge(min_correct_reflection, on="question_id", how="left")
     df["reflection_times_norm"] = df["reflection_times"] - df["min_correct_reflection_times"]
-    grouped = (
-        df.groupby("reflection_times_norm")[
-            ["precision", "recall", "model_confidence_extracted", "overconfidence_rate"]
-        ]
-        .mean()
-        .reset_index()
+
+    # 计算每个 reflection_times_norm 组的统计量
+    grouped_basic = (
+        df.groupby("reflection_times_norm")[["precision", "recall", "model_confidence_extracted"]].mean().reset_index()
     )
 
+    # 为每个 reflection_times_norm 组计算 ECE
+    ece_values = []
+    for norm_time in df["reflection_times_norm"].unique():
+        if pd.isna(norm_time):
+            ece_values.append((norm_time, float("nan")))
+        else:
+            group_data = df[df["reflection_times_norm"] == norm_time]
+            ece_value = ece(group_data, metric_column="recall")
+            ece_values.append((norm_time, ece_value))
+
+    ece_df = pd.DataFrame(ece_values, columns=["reflection_times_norm", "ece"])
+    grouped = grouped_basic.merge(ece_df, on="reflection_times_norm")
+
     plt.figure(figsize=(16, 4))
-    for i, metric in enumerate(["precision", "recall", "model_confidence_extracted", "overconfidence_rate"]):
+    for i, metric in enumerate(["precision", "recall", "model_confidence_extracted", "ece"]):
         if metric == "precision":
             ylabel = "Precision"
         elif metric == "recall":
             ylabel = "Recall"
         elif metric == "model_confidence_extracted":
             ylabel = "Confidence"
-        elif metric == "overconfidence_rate":
-            ylabel = "Confidence - Recall"
+        elif metric == "ece":
+            ylabel = "ECE"
         else:
             raise ValueError(f"Unknown metric: {metric}")
-        valid_df = df[["reflection_times_norm", metric]].dropna()
-        corr, p = spearmanr(valid_df["reflection_times_norm"], valid_df[metric])
-        significant = False if p >= 0.05 else True
+
+        # 对于 ECE，使用 grouped 数据进行相关性计算
+        if metric == "ece":
+            valid_df = grouped[["reflection_times_norm", metric]].dropna()
+        else:
+            valid_df = df[["reflection_times_norm", metric]].dropna()
+
+        # 计算相关性，简化处理避免类型问题
+        try:
+            result = spearmanr(valid_df["reflection_times_norm"].values, valid_df[metric].values)
+            corr = result[0]
+            p_value = result[1]
+            # 使用字符串比较避免类型问题
+            significant = str(p_value) != "nan" and float(str(p_value)) < 0.05
+        except Exception:
+            corr = 0.0
+            p_value = 1.0
+            significant = False
         plt.subplot(1, 4, i + 1)
         sns.lineplot(data=grouped, x="reflection_times_norm", y=metric, marker="o")
         plt.xlabel("Normalized Reflection Times")
         plt.ylabel(ylabel)
-        plt.title(f"Spearmanr Corr: {corr:.2f}\np: {p:.2g} {'(Significant)' if significant else '(Not Significant)'}")
+        plt.title(
+            f"Spearmanr Corr: {corr:.2f}\np: {p_value:.2g} {'(Significant)' if significant else '(Not Significant)'}"
+        )
     plt.tight_layout()
-    plt.savefig(f"figures/reflection-qwen-{dataset}.pdf")
+    plt.savefig(f"figures/reflection-{model.series_name.lower()}-{dataset}.pdf")
     plt.show()
 
 

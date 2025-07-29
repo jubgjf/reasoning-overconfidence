@@ -10,7 +10,7 @@ from confidence.model import ModelName
 
 
 async def main():
-    dataset = DatasetName.TimeTabling
+    dataset = DatasetName.SubsetSum
     turn = 0
     temperature = 0.2
     model = ModelName.QWEN3_8B_NO_THINK

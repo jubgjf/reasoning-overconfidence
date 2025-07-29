@@ -4,7 +4,7 @@ from matplotlib import pyplot as plt
 from tortoise import run_async
 
 from confidence.dataset import DatasetName
-from confidence.evaluate import add_confidence_column, prf
+from confidence.evaluate import add_confidence_column, ece, prf
 from confidence.logger import Logger
 from confidence.model import ModelName
 
@@ -38,46 +38,58 @@ async def main():
             # 计算指标
             df = prf(df, dataset)
             df = add_confidence_column(df)
+            
+            # 计算 ECE 值
+            ece_value = ece(df, metric_column="recall")
+            df["ece"] = ece_value
 
             records_list.append(df)
 
     df = pd.concat(records_list, ignore_index=True)
 
     # 绘制 Precision vs Temperature
-    plt.figure()
-    # sns.scatterplot(data=df, x="temperature", y="precision", hue="dataset", s=50)
+    plt.figure(figsize=(6, 3))
     sns.lineplot(data=df, x="temperature", y="precision", hue="dataset", marker="o")
     plt.xlabel("Temperature")
     plt.ylabel("Precision")
-    # plt.title("Precision vs Temperature")
     plt.legend(title="Dataset")
     plt.grid(True, alpha=0.3)
-    plt.savefig("figures/temperature-qwen-precision.pdf")
-    plt.show()
+    plt.tight_layout()
+    plt.savefig(f"figures/temperature-{model.series_name.lower()}-precision.pdf")
+    # plt.show()
 
     # 绘制 Recall vs Temperature
-    plt.figure()
-    # sns.scatterplot(data=df, x="temperature", y="recall", hue="dataset", s=50)
+    plt.figure(figsize=(6, 3))
     sns.lineplot(data=df, x="temperature", y="recall", hue="dataset", marker="o")
     plt.xlabel("Temperature")
     plt.ylabel("Recall")
-    # plt.title("Recall vs Temperature")
     plt.legend(title="Dataset")
     plt.grid(True, alpha=0.3)
-    plt.savefig("figures/temperature-qwen-recall.pdf")
-    plt.show()
+    plt.tight_layout()
+    plt.savefig(f"figures/temperature-{model.series_name.lower()}-recall.pdf")
+    # plt.show()
 
     # 绘制 Model Confidence vs Temperature
-    plt.figure()
-    # sns.scatterplot(data=df, x="temperature", y="model_confidence_extracted", hue="dataset", s=50)
+    plt.figure(figsize=(6, 3))
     sns.lineplot(data=df, x="temperature", y="model_confidence_extracted", hue="dataset", marker="o")
     plt.xlabel("Temperature")
     plt.ylabel("Model Confidence")
-    # plt.title("Model Confidence vs Temperature")
     plt.legend(title="Dataset")
     plt.grid(True, alpha=0.3)
-    plt.savefig("figures/temperature-qwen-confidence.pdf")
-    plt.show()
+    plt.tight_layout()
+    plt.savefig(f"figures/temperature-{model.series_name.lower()}-confidence.pdf")
+    # plt.show()
+
+    # 绘制 ECE vs Temperature
+    plt.figure(figsize=(6, 3))
+    sns.lineplot(data=df, x="temperature", y="ece", hue="dataset", marker="o")
+    plt.xlabel("Temperature")
+    plt.ylabel("ECE (r)")
+    plt.legend(title="Dataset")
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(f"figures/temperature-{model.series_name.lower()}-ece.pdf")
+    # plt.show()
 
 
 if __name__ == "__main__":

@@ -17,19 +17,21 @@ class Setting(BaseModel):
 
 
 async def main():
-    dataset = DatasetName.SubsetSum
-    # dataset = DatasetName.TimeTabling
+    # dataset = DatasetName.SubsetSum
+    dataset = DatasetName.TimeTabling
     temperature = 0.2
     turn = 0
 
     settings = [
-        Setting(model=ModelName.QWEN3_8B_THINK, template="simple"),
-        Setting(model=ModelName.QWEN3_8B_NO_THINK, template="cot"),
+        # Setting(model=ModelName.QWEN3_8B_THINK, template="simple"),
+        # Setting(model=ModelName.QWEN3_8B_NO_THINK, template="cot"),
         # Setting(model=ModelName.DEEPSEEK_R1, template="simple"),
         # Setting(model=ModelName.DEEPSEEK_V3, template="cot"),
-        # Setting(model=ModelName.O4_MINI, template="simple"),
-        # Setting(model=ModelName.GPT_4O_MINI, template="cot"),
+        Setting(model=ModelName.O4_MINI, template="simple"),
+        Setting(model=ModelName.GPT_4O_MINI, template="cot"),
     ]
+    model_series_name = settings[0].model.series_name
+    assert all(setting.model.series_name == model_series_name for setting in settings)
 
     records_list = []
     for setting in settings:
@@ -59,16 +61,18 @@ async def main():
     sns.lineplot(data=df, x="answer_count_bin", y="recall", hue="setting")
     plt.xlabel("Complexity Bin")
     plt.ylabel("Recall")
-    # plt.title("TimeTabling")
-    plt.savefig(f"figures/complexity-qwen-{dataset}-recall.pdf")
+    plt.title(f"{model_series_name} on {dataset.name}")
+    plt.tight_layout()
+    plt.savefig(f"figures/complexity-{model_series_name.lower()}-{dataset}-recall.pdf")
     # plt.show()
 
     plt.figure(figsize=(6, 3))
     sns.lineplot(data=df, x="answer_count_bin", y="model_confidence_extracted", hue="setting")
     plt.xlabel("Complexity Bin")
     plt.ylabel("Confidence")
-    # plt.title("TimeTabling")
-    plt.savefig(f"figures/complexity-qwen-{dataset}-confidence.pdf")
+    plt.title(f"{model_series_name} on {dataset.name}")
+    plt.tight_layout()
+    plt.savefig(f"figures/complexity-{model_series_name.lower()}-{dataset}-confidence.pdf")
     # plt.show()
 
 
