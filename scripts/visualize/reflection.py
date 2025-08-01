@@ -126,20 +126,16 @@ async def main():
     # 为ECE单独过滤
     grouped_ece_filtered = grouped[grouped["ece_sample_count"] >= min_sample_threshold].copy()
 
-    plt.figure(figsize=(16, 4))
+    plt.figure(figsize=(12, 3.2))
     for i, metric in enumerate(["precision", "recall", "model_confidence_extracted", "ece"]):
         if metric == "precision":
             ylabel = "Precision"
-            std_col = "precision_std"
         elif metric == "recall":
             ylabel = "Recall"
-            std_col = "recall_std"
         elif metric == "model_confidence_extracted":
             ylabel = "Confidence"
-            std_col = "confidence_std"
         elif metric == "ece":
             ylabel = "ECE"
-            std_col = None
         else:
             raise ValueError(f"Unknown metric: {metric}")
 
@@ -164,37 +160,16 @@ async def main():
 
         plt.subplot(1, 4, i + 1)
 
-        # 绘制散点和线条（使用置信区间带替代误差棒）
-        if std_col and len(plot_data) > 0:
-            # 计算标准误差
-            plot_data_copy = plot_data.copy()
-            plot_data_copy["se"] = plot_data_copy[std_col] / np.sqrt(plot_data_copy["sample_count"])
-
-            # 绘制置信区间带
-            plt.fill_between(
-                plot_data_copy["reflection_times_norm"],
-                plot_data_copy[metric] - plot_data_copy["se"],
-                plot_data_copy[metric] + plot_data_copy["se"],
-                alpha=0.5,
-                color="lightblue",
-                label="95% CI",
-            )
-
-            # 绘制数据点和连线（使用sns.lineplot保持一致）
-            sns.lineplot(
-                data=plot_data_copy,
-                x="reflection_times_norm",
-                y=metric,
-                marker="o",
-                markersize=6,
-                linewidth=2,
-                alpha=0.8,
-                label="Data",
-            )
-        else:
-            sns.lineplot(
-                data=plot_data, x="reflection_times_norm", y=metric, marker="o", markersize=6, linewidth=2, label="Data"
-            )
+        # 绘制数据点和连线（统一风格）
+        sns.lineplot(
+            data=plot_data,
+            x="reflection_times_norm",
+            y=metric,
+            marker="o",
+            markersize=6,
+            linewidth=2,
+            label="Data",
+        )
 
         # 线性拟合
         if len(valid_df) > 1:
@@ -219,7 +194,7 @@ async def main():
 
         plt.xlabel("Normalized Reflection Times")
         plt.ylabel(ylabel)
-        plt.title(f"Corr: {corr:.2f}, p: {p_value:.2g} ({'Significant' if significant else 'Not Significant'})")
+        plt.title(f"Corr: {corr:.2f}, p: {p_value:.2g}\n({'Significant' if significant else 'Not Significant'})")
         plt.legend()
 
     plt.tight_layout()

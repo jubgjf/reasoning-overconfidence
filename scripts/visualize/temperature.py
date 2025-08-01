@@ -54,7 +54,7 @@ async def main():
     color2 = "tab:red"
 
     # 上半部分的左y轴 - Recall
-    sns.lineplot(data=df, x="temperature", y="recall", color=color1, marker="o", label="Recall", ax=ax1_top)
+    sns.lineplot(data=df, x="temperature", y="recall", color=color1, marker="o", label="Recall", ax=ax1_top, ci=None)
     ax1_top.tick_params(axis="y", labelcolor=color1)
     ax1_top.set_ylim(0.8, 1.0)
     ax1_top.grid(True, alpha=0.3)
@@ -62,7 +62,7 @@ async def main():
 
     # 上半部分的右y轴 - ECE
     ax2_top = ax1_top.twinx()
-    sns.lineplot(data=df, x="temperature", y="ece", color=color2, marker="s", label="ECE", ax=ax2_top)
+    sns.lineplot(data=df, x="temperature", y="ece", color=color2, marker="s", label="ECE", ax=ax2_top, ci=None)
     ax2_top.tick_params(axis="y", labelcolor=color2)
     ax2_top.set_ylim(0.8, 1.0)
     ax2_top.set_ylabel("")  # 移除默认的y轴标签
@@ -70,7 +70,7 @@ async def main():
     # 下半部分 - 显示 0-0.2 范围
     # 下半部分的左y轴 - Recall
     ax1_bottom.set_xlabel("Temperature")
-    sns.lineplot(data=df, x="temperature", y="recall", color=color1, marker="o", ax=ax1_bottom)
+    sns.lineplot(data=df, x="temperature", y="recall", color=color1, marker="o", ax=ax1_bottom, ci=None)
     ax1_bottom.tick_params(axis="y", labelcolor=color1)
     ax1_bottom.set_ylim(0, 0.2)
     ax1_bottom.grid(True, alpha=0.3)
@@ -78,7 +78,7 @@ async def main():
 
     # 下半部分的右y轴 - ECE
     ax2_bottom = ax1_bottom.twinx()
-    sns.lineplot(data=df, x="temperature", y="ece", color=color2, marker="s", ax=ax2_bottom)
+    sns.lineplot(data=df, x="temperature", y="ece", color=color2, marker="s", ax=ax2_bottom, ci=None)
     ax2_bottom.tick_params(axis="y", labelcolor=color2)
     ax2_bottom.set_ylim(0, 0.2)
     ax2_bottom.set_ylabel("")  # 移除默认的y轴标签

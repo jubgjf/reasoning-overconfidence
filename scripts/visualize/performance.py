@@ -26,10 +26,10 @@ async def main():
     temperature = 0.2
 
     settings = [
-        Setting(model=ModelName.QWEN3_8B_THINK, template="simple"),
-        Setting(model=ModelName.QWEN3_8B_NO_THINK, template="cot"),
-        # Setting(model=ModelName.DEEPSEEK_R1, template="simple"),
-        # Setting(model=ModelName.DEEPSEEK_V3, template="cot"),
+        # Setting(model=ModelName.QWEN3_8B_THINK, template="simple"),
+        # Setting(model=ModelName.QWEN3_8B_NO_THINK, template="cot"),
+        Setting(model=ModelName.DEEPSEEK_R1, template="simple"),
+        Setting(model=ModelName.DEEPSEEK_V3, template="cot"),
         # Setting(model=ModelName.O4_MINI, template="simple"),
         # Setting(model=ModelName.GPT_4O_MINI, template="cot"),
     ]
@@ -88,63 +88,6 @@ async def main():
         else:
             density = np.ones_like(x)
         df.loc[mask, "density"] = density
-
-    # 创建 JointGrid
-    g = sns.JointGrid(
-        data=df,
-        x="model_confidence_extracted",
-        y="recall",
-        hue="setting",
-        height=6,
-        space=0,
-    )
-
-    # 主图：密度为点大小的散点图
-    for setting in ["Long-CoT", "Short-CoT"]:
-        color = palette[setting]
-        sub = df[df["setting"] == setting]
-        g.ax_joint.scatter(
-            sub["model_confidence_extracted"],
-            sub["recall"],
-            s=50 + 200 * (sub["density"] - sub["density"].min()) / (sub["density"].max() - sub["density"].min() + 1e-6),
-            alpha=0.5,
-            color=color,
-            label=setting,
-            edgecolor="k",
-            linewidth=0.5,
-        )
-
-    # x 轴密度
-    for setting, color in palette.items():
-        data = df[df["setting"] == setting]["model_confidence_extracted"].values
-        sns.kdeplot(
-            x=data,
-            ax=g.ax_marg_x,
-            color=color,
-            fill=True,
-            alpha=0.3,
-            label=setting,
-        )
-
-    # y 轴密度
-    for setting, color in palette.items():
-        data = df[df["setting"] == setting]["recall"].values
-        sns.kdeplot(
-            y=data,
-            ax=g.ax_marg_y,
-            color=color,
-            fill=True,
-            alpha=0.3,
-            label=setting,
-        )
-
-    g.ax_joint.set_xlabel("Confidence")
-    g.ax_joint.set_ylabel("Recall")
-    g.ax_joint.set_xlim(-0.02, 1.02)
-    g.ax_joint.set_ylim(-0.02, 1.02)
-    g.ax_joint.legend(title="Setting")
-    # plt.savefig(f"figures/performance-2d-qwen-{dataset}-recall.pdf")
-    # plt.show()
 
     fig = plt.figure(figsize=(4, 4))
     ax = fig.add_subplot(111, projection="3d")
@@ -286,6 +229,8 @@ async def main():
     radius = grid_width * 1.2  # 邻域半径
     U = np.zeros_like(xx)
     V = np.zeros_like(yy)
+    arrow_colors = np.full(xx.shape, 'gray', dtype=object)  # 默认颜色为灰色
+    
     for i, (gx, gy) in enumerate(grid_points):
         dists = np.sqrt((short_points[:, 0] - gx) ** 2 + (short_points[:, 1] - gy) ** 2)
         mask = dists < radius
@@ -297,22 +242,67 @@ async def main():
                 mean_vec = mean_vec / norm * grid_width
             U.ravel()[i] = mean_vec[0]
             V.ravel()[i] = mean_vec[1]
+            
+            # 判断箭头是否指向对角线方向
+            if norm > 0:
+                arrow_dir = mean_vec / norm
+                
+                # 判断当前点相对于对角线的位置
+                # 对角线方程: y = x，即 x - y = 0
+                distance_to_diagonal = gx - gy
+                
+                if distance_to_diagonal > 0:
+                    # 点在对角线右下方（overconfident区域，confidence > recall）
+                    # 指向校准的方向应该是向左上（减少confidence或增加recall）
+                    # 目标方向向量 (-1, 1)，归一化后为 (-1/√2, 1/√2)
+                    target_dir = np.array([-1, 1]) / np.sqrt(2)
+                else:
+                    # 点在对角线左上方（underconfident区域，confidence < recall）
+                    # 指向校准的方向应该是向右下（增加confidence或减少recall）
+                    # 目标方向向量 (1, -1)，归一化后为 (1/√2, -1/√2)
+                    target_dir = np.array([1, -1]) / np.sqrt(2)
+                
+                # 计算箭头方向与目标方向的夹角余弦值
+                cos_angle = np.dot(arrow_dir, target_dir)
+                # 如果夹角小于90度（余弦值大于0），则认为指向校准方向
+                if cos_angle > 0:
+                    row, col = np.unravel_index(i, xx.shape)
+                    arrow_colors[row, col] = 'red'
+
 
     # 5. 绘制
     plt.figure(figsize=(4, 4))
     plt.scatter(short_points[:, 0], short_points[:, 1], c="tab:orange", alpha=0.1, label="Short-CoT")
     plt.scatter(long_points[:, 0], long_points[:, 1], c="tab:blue", alpha=0.1, label="Long-CoT")
-    plt.quiver(xx, yy, U, V, angles="xy", scale_units="xy", scale=1.5, color="gray", width=0.01, alpha=1.0)
+    
+    # 分别绘制不同颜色的箭头
+    for color in ['gray', 'red']:
+        mask = (arrow_colors == color)
+        if np.any(mask):
+            plt.quiver(xx[mask], yy[mask], U[mask], V[mask], 
+                      angles="xy", scale_units="xy", scale=1.5, 
+                      color=color, width=0.01, alpha=1.0)
+    
     # 添加对角线
-    plt.plot([x_min, x_max], [y_min, y_max], "k--", alpha=0.5, linewidth=1)
+    plt.plot([x_min, x_max], [y_min, y_max], "k--", alpha=0.5, linewidth=1, label="Perfectly Calibrated")
+    
+    # 创建自定义图例，使用不透明的颜色
+    from matplotlib.lines import Line2D
+    legend_elements = [
+        Line2D([0], [0], marker='o', color='w', markerfacecolor='tab:orange', markersize=8, alpha=1.0, label='Short-CoT'),
+        Line2D([0], [0], marker='o', color='w', markerfacecolor='tab:blue', markersize=8, alpha=1.0, label='Long-CoT'),
+        Line2D([0], [0], color='k', linestyle='--', alpha=1.0, label='Perfectly Calibrated'),
+        Line2D([0], [0], color='red', marker='>', markersize=8, alpha=1.0, label='Toward Calibration')
+    ]
+    
     plt.xlabel("Confidence")
     plt.ylabel("Recall")
     plt.xlim(x_min - 0.02, x_max + 0.02)
     plt.ylim(y_min - 0.02, y_max + 0.02)
-    plt.legend()
+    plt.legend(handles=legend_elements)
     plt.title(f"{model_series_name} on {dataset.name}")
     plt.tight_layout()
-    # plt.savefig(f"figures/performance-movement-{model_series_name.lower()}-{dataset}-recall.pdf")
+    plt.savefig(f"figures/performance-movement-{model_series_name.lower()}-{dataset}-recall.pdf")
     # plt.show()
 
 
