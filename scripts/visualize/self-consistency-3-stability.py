@@ -30,7 +30,7 @@ def load_self_consistency_data(data_path: str) -> pd.DataFrame:
 
 def main():
     # 配置参数
-    dataset = DatasetName.SubsetSum
+    dataset = DatasetName.TimeTabling
     model = ModelName.QWEN3_8B_THINK
     template = "simple"
     temperature = 0.2
@@ -57,7 +57,12 @@ def main():
     for method in methods:
         print(f"\nProcessing method: {method}")
         method_df = df[df["method"] == method]
-        
+
+        # 跳过majority voting方法，因为它没有真实的多轮对话历史
+        if method == "Self-Consistency (majority voting)":
+            print(f"Skipping {method} - no multi-round chat history available")
+            continue
+
         chat_history = method_df["chat_history"].values.tolist()
         answer_counts = method_df["answer_count"].values.tolist()
 
@@ -137,7 +142,9 @@ def main():
 
                 # 3. 新解发现率 = （第二轮正确解的数量 - 两轮正确解交集的数量） / 解空间总大小
                 new_correct_solutions = len(second_round_correct) - len(intersection_correct)
-                new_solution_discovery_rate = new_correct_solutions / int(answer_count) if int(answer_count) > 0 else 0.0
+                new_solution_discovery_rate = (
+                    new_correct_solutions / int(answer_count) if int(answer_count) > 0 else 0.0
+                )
                 new_solution_discovery_rates.append(new_solution_discovery_rate)
             else:
                 # 如果没有真实答案，设置为默认值
@@ -155,9 +162,13 @@ def main():
         avg_correct_preservation = (
             sum(correct_preservation_rates) / len(correct_preservation_rates) if correct_preservation_rates else 0.0
         )
-        avg_error_correction = sum(error_correction_rates) / len(error_correction_rates) if error_correction_rates else 0.0
+        avg_error_correction = (
+            sum(error_correction_rates) / len(error_correction_rates) if error_correction_rates else 0.0
+        )
         avg_new_solution_discovery = (
-            sum(new_solution_discovery_rates) / len(new_solution_discovery_rates) if new_solution_discovery_rates else 0.0
+            sum(new_solution_discovery_rates) / len(new_solution_discovery_rates)
+            if new_solution_discovery_rates
+            else 0.0
         )
 
         # 保存该方法的结果
@@ -167,14 +178,18 @@ def main():
             "new_solution_discovery": avg_new_solution_discovery,
         }
 
-        print(f"{method}: {avg_correct_preservation * 100:.2f} {avg_error_correction * 100:.2f} {avg_new_solution_discovery * 100:.2f}")
+        print(
+            f"{method}: {avg_correct_preservation * 100:.2f} {avg_error_correction * 100:.2f} {avg_new_solution_discovery * 100:.2f}"
+        )
 
     # 输出所有方法的结果汇总
     print("\n=== Results Summary ===")
     print("Method\t\t\t\t\tCorrect Preservation\tError Correction\tNew Solution Discovery")
     print("-" * 100)
     for method, results in method_results.items():
-        print(f"{method:<40}\t{results['correct_preservation']*100:.2f}\t\t{results['error_correction']*100:.2f}\t\t{results['new_solution_discovery']*100:.2f}")
+        print(
+            f"{method:<40}\t{results['correct_preservation'] * 100:.2f}\t\t{results['error_correction'] * 100:.2f}\t\t{results['new_solution_discovery'] * 100:.2f}"
+        )
 
 
 if __name__ == "__main__":
