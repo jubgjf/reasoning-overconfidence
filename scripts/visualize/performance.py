@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 from pydantic import BaseModel
 from scipy.stats import gaussian_kde
 from tortoise import run_async
@@ -145,12 +146,12 @@ async def main():
     # plt.savefig(f"figures/performance-2d-qwen-{dataset}-recall.pdf")
     # plt.show()
 
-    fig = plt.figure(figsize=(6, 6))
+    fig = plt.figure(figsize=(4, 4))
     ax = fig.add_subplot(111, projection="3d")
 
     for setting, color in palette.items():
         sub = df[df["setting"] == setting]
-        ax.scatter(  # 改为 ax.scatter 而不是 plt.scatter
+        ax.scatter(
             sub["model_confidence_extracted"],
             sub["recall"],
             sub["density"],
@@ -158,24 +159,111 @@ async def main():
             label=setting,
             alpha=0.6,
             edgecolor="k",
-            linewidth=0.001,
+            linewidth=0.0,
         )
+
+    # 自动计算高密度区域的边界
+    short_cot_data = df[df["setting"] == "Short-CoT"]
+
+    # 找出Short-CoT中density最高的点
+    density_threshold = short_cot_data["density"].quantile(0.3)  # 密度前70%的点
+    high_density_points = short_cot_data[short_cot_data["density"] >= density_threshold]
+
+    if len(high_density_points) > 0:
+        # 计算高密度点的边界
+        conf_values = high_density_points["model_confidence_extracted"]
+        recall_values = high_density_points["recall"]
+
+        # 增加边界扩展幅度，使方框更宽
+        conf_margin = max(0.1, (conf_values.max() - conf_values.min()) * 0.5)  # 最小0.1，或50%扩展
+        recall_margin = max(0.1, (recall_values.max() - recall_values.min()) * 0.5)  # 最小0.1，或50%扩展
+
+        x_range = [max(0, conf_values.min() - conf_margin), min(1.0, conf_values.max() + conf_margin)]
+        y_range = [max(0, recall_values.min() - recall_margin), min(1.0, recall_values.max() + recall_margin)]
+
+        print(f"自动检测到高密度区域:")
+        print(f"  Confidence范围: [{x_range[0]:.3f}, {x_range[1]:.3f}]")
+        print(f"  Recall范围: [{y_range[0]:.3f}, {y_range[1]:.3f}]")
+        print(f"  包含 {len(high_density_points)} 个高密度点")
+    else:
+        # 备用方案：使用更宽的固定范围
+        x_range = [0.6, 1.0]  # 从0.7调整到0.6
+        y_range = [0.0, 0.4]  # 从0.3调整到0.4
+        print("未检测到明显的高密度区域，使用默认范围")
+
+    z_max = df["density"].max()
+
+    vertices = [
+        # 底面
+        [x_range[0], y_range[0], 0],
+        [x_range[1], y_range[0], 0],
+        [x_range[1], y_range[1], 0],
+        [x_range[0], y_range[1], 0],
+        # 顶面
+        [x_range[0], y_range[0], z_max],
+        [x_range[1], y_range[0], z_max],
+        [x_range[1], y_range[1], z_max],
+        [x_range[0], y_range[1], z_max],
+    ]
+
+    # 定义方框的六个面
+    faces = [
+        [vertices[0], vertices[1], vertices[2], vertices[3]],  # 底面
+        [vertices[4], vertices[5], vertices[6], vertices[7]],  # 顶面
+        [vertices[0], vertices[1], vertices[5], vertices[4]],  # 前面
+        [vertices[2], vertices[3], vertices[7], vertices[6]],  # 后面
+        [vertices[1], vertices[2], vertices[6], vertices[5]],  # 右面
+        [vertices[0], vertices[3], vertices[7], vertices[4]],  # 左面
+    ]
+
+    # 添加半透明方框
+    # 柔和颜色选择：可以选择以下任一颜色
+    # 'lightcoral' - 浅珊瑚色，比红色柔和
+    # 'lightpink' - 浅粉色，温和
+    # 'lightsalmon' - 浅鲑鱼色，暖色调
+    # 'peachpuff' - 桃色，非常柔和
+    # 'mistyrose' - 雾玫瑰色，淡雅
+    region_color = "lightcoral"  # 可以替换为上述任意颜色
+
+    poly = Poly3DCollection(faces, alpha=0.2, facecolor=region_color, edgecolor=region_color, linewidth=1)
+    ax.add_collection3d(poly)
 
     ax.set_xlabel("Confidence")
     ax.set_ylabel("Recall")
-    ax.set_zlabel("Density")  # type: ignore
+    ax.set_zlabel("Density")
     ax.set_xlim(-0.05, 1.05)
     ax.set_ylim(-0.05, 1.05)
-    ax.legend(title="Setting")
-    ax.set_title(f"Density Distribution of Confidence-Recall\n{model_series_name} on {dataset.name}")
-    plt.tight_layout()
-    plt.savefig(f"figures/performance-3d-{model_series_name.lower()}-{dataset}-recall.pdf")
+
+    # 创建自定义legend，包含高密度区域说明
+    from matplotlib.patches import Patch
+
+    legend_elements = [
+        plt.Line2D(
+            [0], [0], marker="o", color="w", markerfacecolor=palette["Short-CoT"], markersize=8, label="Short-CoT"
+        ),
+        plt.Line2D(
+            [0], [0], marker="o", color="w", markerfacecolor=palette["Long-CoT"], markersize=8, label="Long-CoT"
+        ),
+        Patch(facecolor=region_color, alpha=0.2, label="Overconfidence Region"),
+    ]
+    ax.legend(handles=legend_elements, title="Setting")
+
+    ax.set_title(f"{model_series_name} on {dataset.name}")
+
+    # 调整轴标签位置
+    ax.xaxis.labelpad = 5
+    ax.yaxis.labelpad = 5
+    ax.zaxis.labelpad = -150
+
+    # 使用subplots_adjust而不是tight_layout
+    plt.subplots_adjust(left=0.1, right=0.9, top=0.9, bottom=0.1)
+    # plt.savefig(f"figures/performance-3d-{model_series_name.lower()}-{dataset}-recall.pdf", bbox_inches="tight")
     # plt.show()
 
     # 1. 构建网格
     x_min, x_max = df["model_confidence_extracted"].min(), df["model_confidence_extracted"].max()
     y_min, y_max = df["recall"].min(), df["recall"].max()
-    n_grid = 20  # 网格数
+    n_grid = 10  # 网格数
     grid_x = np.linspace(x_min, x_max, n_grid)
     grid_y = np.linspace(y_min, y_max, n_grid)
     xx, yy = np.meshgrid(grid_x, grid_y)
@@ -211,10 +299,10 @@ async def main():
             V.ravel()[i] = mean_vec[1]
 
     # 5. 绘制
-    plt.figure(figsize=(6, 6))
+    plt.figure(figsize=(4, 4))
     plt.scatter(short_points[:, 0], short_points[:, 1], c="tab:orange", alpha=0.1, label="Short-CoT")
     plt.scatter(long_points[:, 0], long_points[:, 1], c="tab:blue", alpha=0.1, label="Long-CoT")
-    plt.quiver(xx, yy, U, V, angles="xy", scale_units="xy", scale=1.5, color="gray", width=0.005, alpha=1.0)
+    plt.quiver(xx, yy, U, V, angles="xy", scale_units="xy", scale=1.5, color="gray", width=0.01, alpha=1.0)
     # 添加对角线
     plt.plot([x_min, x_max], [y_min, y_max], "k--", alpha=0.5, linewidth=1)
     plt.xlabel("Confidence")
@@ -222,164 +310,10 @@ async def main():
     plt.xlim(x_min - 0.02, x_max + 0.02)
     plt.ylim(y_min - 0.02, y_max + 0.02)
     plt.legend()
-    plt.title(f"Confidence-Recall Performance Shift from Short-CoT to Long-CoT\n{model_series_name} on {dataset.name}")
+    plt.title(f"{model_series_name} on {dataset.name}")
     plt.tight_layout()
-    plt.savefig(f"figures/performance-movement-{model_series_name.lower()}-{dataset}-recall.pdf")
+    # plt.savefig(f"figures/performance-movement-{model_series_name.lower()}-{dataset}-recall.pdf")
     # plt.show()
-
-    # # ============================ PRECISION ============================
-
-    # palette = {"Short-CoT": "tab:orange", "Long-CoT": "tab:blue"}
-    # # 计算每个 setting 的密度
-    # for setting in ["Short-CoT", "Long-CoT"]:
-    #     mask = df["setting"] == setting
-    #     x = df.loc[mask, "model_confidence_extracted"].values.astype(float)
-    #     y = df.loc[mask, "precision"].values.astype(float)
-    #     if len(x) > 1:
-    #         kde = gaussian_kde(np.vstack([x, y]))
-    #         density = kde(np.vstack([x, y]))
-    #     else:
-    #         density = np.ones_like(x)
-    #     df.loc[mask, "density"] = density
-
-    # # 创建 JointGrid
-    # g = sns.JointGrid(
-    #     data=df,
-    #     x="model_confidence_extracted",
-    #     y="precision",
-    #     hue="setting",
-    #     height=6,
-    #     space=0,
-    # )
-
-    # # 主图：密度为点大小的散点图
-    # for setting in ["Long-CoT", "Short-CoT"]:
-    #     color = palette[setting]
-    #     sub = df[df["setting"] == setting]
-    #     g.ax_joint.scatter(
-    #         sub["model_confidence_extracted"],
-    #         sub["precision"],
-    #         s=50 + 200 * (sub["density"] - sub["density"].min()) / (sub["density"].max() - sub["density"].min() + 1e-6),
-    #         alpha=0.5,
-    #         color=color,
-    #         label=setting,
-    #         edgecolor="k",
-    #         linewidth=0.5,
-    #     )
-
-    # # x 轴密度
-    # for setting, color in palette.items():
-    #     data = df[df["setting"] == setting]["model_confidence_extracted"].values
-    #     sns.kdeplot(
-    #         x=data,
-    #         ax=g.ax_marg_x,
-    #         color=color,
-    #         fill=True,
-    #         alpha=0.3,
-    #         label=setting,
-    #     )
-
-    # # y 轴密度
-    # for setting, color in palette.items():
-    #     data = df[df["setting"] == setting]["precision"].values
-    #     sns.kdeplot(
-    #         y=data,
-    #         ax=g.ax_marg_y,
-    #         color=color,
-    #         fill=True,
-    #         alpha=0.3,
-    #         label=setting,
-    #     )
-
-    # g.ax_joint.set_xlabel("Confidence")
-    # g.ax_joint.set_ylabel("Precision")
-    # g.ax_joint.set_xlim(-0.02, 1.02)
-    # g.ax_joint.set_ylim(-0.02, 1.02)
-    # g.ax_joint.legend(title="Setting")
-    # # plt.savefig(f"figures/performance-2d-qwen-{dataset}-precision.pdf")
-    # # plt.show()
-
-    # plt.figure(figsize=(6, 6))
-    # ax = fig.add_subplot(111, projection="3d")
-
-    # for setting, color in palette.items():
-    #     sub = df[df["setting"] == setting]
-    #     ax.scatter(  # 改为 ax.scatter 而不是 plt.scatter
-    #         sub["model_confidence_extracted"],
-    #         sub["precision"],
-    #         sub["density"],
-    #         c=color,
-    #         label=setting,
-    #         alpha=0.6,
-    #         edgecolor="k",
-    #         linewidth=0.1,
-    #     )
-
-    # ax.set_xlabel("Confidence")
-    # ax.set_ylabel("Precision")
-    # ax.set_zlabel("Density")  # type: ignore
-    # ax.set_xlim(-0.05, 1.05)
-    # ax.set_ylim(-0.05, 1.05)
-    # ax.legend(title="Setting")
-    # ax.set_title(f"Density Distribution of Confidence-Precision\nQwen on {dataset}")
-    # plt.tight_layout()
-    # plt.savefig(f"figures/performance-3d-qwen-{dataset}-precision.pdf")
-    # # plt.show()
-
-    # # 1. 构建网格
-    # x_min, x_max = df["model_confidence_extracted"].min(), df["model_confidence_extracted"].max()
-    # y_min, y_max = df["precision"].min(), df["precision"].max()
-    # n_grid = 20  # 网格数
-    # grid_x = np.linspace(x_min, x_max, n_grid)
-    # grid_y = np.linspace(y_min, y_max, n_grid)
-    # xx, yy = np.meshgrid(grid_x, grid_y)
-    # grid_points = np.c_[xx.ravel(), yy.ravel()]
-    # grid_width = (x_max - x_min) / (n_grid - 1)
-
-    # # 2. 取交集
-    # short_df = df[df["setting"] == "Short-CoT"].set_index("question_id")
-    # long_df = df[df["setting"] == "Long-CoT"].set_index("question_id")
-    # common_ids = np.intersect1d(short_df.index, long_df.index)
-    # short_common = short_df.loc[common_ids]
-    # long_common = long_df.loc[common_ids]
-
-    # # 3. 计算每个点的移动向量
-    # short_points = short_common[["model_confidence_extracted", "precision"]].values
-    # long_points = long_common[["model_confidence_extracted", "precision"]].values
-    # move_vecs = long_points - short_points
-
-    # # 4. 对每个网格点，统计附近的点，计算平均向量
-    # radius = grid_width * 1.2  # 邻域半径
-    # U = np.zeros_like(xx)
-    # V = np.zeros_like(yy)
-    # for i, (gx, gy) in enumerate(grid_points):
-    #     dists = np.sqrt((short_points[:, 0] - gx) ** 2 + (short_points[:, 1] - gy) ** 2)
-    #     mask = dists < radius
-    #     if np.any(mask):
-    #         mean_vec = move_vecs[mask].mean(axis=0)
-    #         # 限制箭头长度
-    #         norm = np.linalg.norm(mean_vec)
-    #         if norm > grid_width:
-    #             mean_vec = mean_vec / norm * grid_width
-    #         U.ravel()[i] = mean_vec[0]
-    #         V.ravel()[i] = mean_vec[1]
-
-    # # 5. 绘制
-    # plt.figure(figsize=(6, 6))
-    # plt.scatter(short_points[:, 0], short_points[:, 1], c="tab:orange", alpha=0.1, label="Short-CoT")
-    # plt.scatter(long_points[:, 0], long_points[:, 1], c="tab:blue", alpha=0.1, label="Long-CoT")
-    # plt.quiver(xx, yy, U, V, angles="xy", scale_units="xy", scale=1.5, color="gray", width=0.005, alpha=1.0)
-    # # 添加对角线
-    # plt.plot([x_min, x_max], [y_min, y_max], 'k--', alpha=0.5, linewidth=1)
-    # plt.xlabel("Confidence")
-    # plt.ylabel("Precision")
-    # plt.xlim(x_min - 0.02, x_max + 0.02)
-    # plt.ylim(y_min - 0.02, y_max + 0.02)
-    # plt.legend()
-    # plt.title(f"Confidence-Precision Performance Shift from Short-CoT to Long-CoT\nQwen on {dataset}")
-    # plt.tight_layout()
-    # plt.savefig(f"figures/performance-movement-qwen-{dataset}-precision.pdf")
-    # # plt.show()
 
 
 if __name__ == "__main__":

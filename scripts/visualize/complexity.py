@@ -23,12 +23,12 @@ async def main():
     turn = 0
 
     settings = [
-        # Setting(model=ModelName.QWEN3_8B_THINK, template="simple"),
-        # Setting(model=ModelName.QWEN3_8B_NO_THINK, template="cot"),
+        Setting(model=ModelName.QWEN3_8B_THINK, template="simple"),
+        Setting(model=ModelName.QWEN3_8B_NO_THINK, template="cot"),
         # Setting(model=ModelName.DEEPSEEK_R1, template="simple"),
         # Setting(model=ModelName.DEEPSEEK_V3, template="cot"),
-        Setting(model=ModelName.O4_MINI, template="simple"),
-        Setting(model=ModelName.GPT_4O_MINI, template="cot"),
+        # Setting(model=ModelName.O4_MINI, template="simple"),
+        # Setting(model=ModelName.GPT_4O_MINI, template="cot"),
     ]
     model_series_name = settings[0].model.series_name
     assert all(setting.model.series_name == model_series_name for setting in settings)
@@ -57,7 +57,7 @@ async def main():
     df = prf(df, dataset)
     df = add_confidence_column(df)
 
-    plt.figure(figsize=(6, 3))
+    plt.figure(figsize=(4, 3))
     sns.lineplot(data=df, x="answer_count_bin", y="recall", hue="setting")
     plt.xlabel("Complexity Bin")
     plt.ylabel("Recall")
@@ -66,7 +66,7 @@ async def main():
     plt.savefig(f"figures/complexity-{model_series_name.lower()}-{dataset}-recall.pdf")
     # plt.show()
 
-    plt.figure(figsize=(6, 3))
+    plt.figure(figsize=(4, 3))
     sns.lineplot(data=df, x="answer_count_bin", y="model_confidence_extracted", hue="setting")
     plt.xlabel("Complexity Bin")
     plt.ylabel("Confidence")

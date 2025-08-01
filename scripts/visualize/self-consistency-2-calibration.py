@@ -107,7 +107,6 @@ def plot_calibration_charts(
 
         # 只对有实际数据的点进行绘制
         valid = ~np.isnan(mean_accuracys)
-        ece_value = ece_dict[method] * 100  # 乘以100转换为百分比
 
         if method == "Long-CoT":
             method_short_name = "Long-CoT"
@@ -128,7 +127,7 @@ def plot_calibration_charts(
             mean_accuracys,
             width=0.07,
             alpha=0.6,
-            label=f"{method_short_name} (ECE={ece_value:.2f})",
+            label=f"{method_short_name}",
             align="center",
             edgecolor="black",
             color=color,
@@ -421,7 +420,7 @@ def plot_2d_density_charts(
 def main():
     """主函数：读取数据并生成所有图表"""
     # 配置参数
-    dataset = DatasetName.SubsetSum
+    dataset = DatasetName.TimeTabling
     model = ModelName.QWEN3_8B_THINK
     template = "simple"
     temperature = 0.2

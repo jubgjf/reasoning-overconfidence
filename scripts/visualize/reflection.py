@@ -1,9 +1,11 @@
 import re
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import seaborn as sns
 from scipy.stats import spearmanr
+from sklearn.linear_model import LinearRegression
 from tortoise import run_async
 
 from confidence.dataset import DatasetName
@@ -47,7 +49,7 @@ def count_reflections(history_thinking_content: str) -> int:
 async def main():
     model = ModelName.QWEN3_8B_THINK
     template = "simple"
-    dataset = DatasetName.SubsetSum
+    dataset = DatasetName.TimeTabling
     turn = 0
     temperature = 0.2
 
@@ -93,59 +95,141 @@ async def main():
         df.groupby("reflection_times_norm")[["precision", "recall", "model_confidence_extracted"]].mean().reset_index()
     )
 
+    # 添加样本量统计，用于过滤噪声
+    sample_counts = df.groupby("reflection_times_norm").size().reset_index(name="sample_count")
+    grouped_basic = grouped_basic.merge(sample_counts, on="reflection_times_norm")
+
+    # 添加标准误差计算
+    grouped_std = (
+        df.groupby("reflection_times_norm")[["precision", "recall", "model_confidence_extracted"]].std().reset_index()
+    )
+    grouped_std.columns = ["reflection_times_norm", "precision_std", "recall_std", "confidence_std"]
+    grouped_basic = grouped_basic.merge(grouped_std, on="reflection_times_norm")
+
     # 为每个 reflection_times_norm 组计算 ECE
     ece_values = []
     for norm_time in df["reflection_times_norm"].unique():
         if pd.isna(norm_time):
-            ece_values.append((norm_time, float("nan")))
+            ece_values.append((norm_time, float("nan"), 0))
         else:
             group_data = df[df["reflection_times_norm"] == norm_time]
             ece_value = ece(group_data, metric_column="recall")
-            ece_values.append((norm_time, ece_value))
+            ece_values.append((norm_time, ece_value, len(group_data)))
 
-    ece_df = pd.DataFrame(ece_values, columns=["reflection_times_norm", "ece"])
+    ece_df = pd.DataFrame(ece_values, columns=["reflection_times_norm", "ece", "ece_sample_count"])
     grouped = grouped_basic.merge(ece_df, on="reflection_times_norm")
+
+    # 过滤样本量过少的数据点（保留样本量>=5的数据点）
+    min_sample_threshold = 5
+    grouped_filtered = grouped[grouped["sample_count"] >= min_sample_threshold].copy()
+
+    # 为ECE单独过滤
+    grouped_ece_filtered = grouped[grouped["ece_sample_count"] >= min_sample_threshold].copy()
 
     plt.figure(figsize=(16, 4))
     for i, metric in enumerate(["precision", "recall", "model_confidence_extracted", "ece"]):
         if metric == "precision":
             ylabel = "Precision"
+            std_col = "precision_std"
         elif metric == "recall":
             ylabel = "Recall"
+            std_col = "recall_std"
         elif metric == "model_confidence_extracted":
             ylabel = "Confidence"
+            std_col = "confidence_std"
         elif metric == "ece":
             ylabel = "ECE"
+            std_col = None
         else:
             raise ValueError(f"Unknown metric: {metric}")
 
-        # 对于 ECE，使用 grouped 数据进行相关性计算
+        # 选择过滤后的数据
         if metric == "ece":
-            valid_df = grouped[["reflection_times_norm", metric]].dropna()
+            plot_data = grouped_ece_filtered
+            valid_df = grouped_ece_filtered[["reflection_times_norm", metric]].dropna()
         else:
-            valid_df = df[["reflection_times_norm", metric]].dropna()
+            plot_data = grouped_filtered
+            valid_df = grouped_filtered[["reflection_times_norm", metric]].dropna()
 
-        # 计算相关性，简化处理避免类型问题
+        # 计算相关性
         try:
             result = spearmanr(valid_df["reflection_times_norm"].values, valid_df[metric].values)
             corr = result[0]
             p_value = result[1]
-            # 使用字符串比较避免类型问题
             significant = str(p_value) != "nan" and float(str(p_value)) < 0.05
         except Exception:
             corr = 0.0
             p_value = 1.0
             significant = False
+
         plt.subplot(1, 4, i + 1)
-        sns.lineplot(data=grouped, x="reflection_times_norm", y=metric, marker="o")
+
+        # 绘制散点和线条（使用置信区间带替代误差棒）
+        if std_col and len(plot_data) > 0:
+            # 计算标准误差
+            plot_data_copy = plot_data.copy()
+            plot_data_copy["se"] = plot_data_copy[std_col] / np.sqrt(plot_data_copy["sample_count"])
+
+            # 绘制置信区间带
+            plt.fill_between(
+                plot_data_copy["reflection_times_norm"],
+                plot_data_copy[metric] - plot_data_copy["se"],
+                plot_data_copy[metric] + plot_data_copy["se"],
+                alpha=0.5,
+                color="lightblue",
+                label="95% CI",
+            )
+
+            # 绘制数据点和连线（使用sns.lineplot保持一致）
+            sns.lineplot(
+                data=plot_data_copy,
+                x="reflection_times_norm",
+                y=metric,
+                marker="o",
+                markersize=6,
+                linewidth=2,
+                alpha=0.8,
+                label="Data",
+            )
+        else:
+            sns.lineplot(
+                data=plot_data, x="reflection_times_norm", y=metric, marker="o", markersize=6, linewidth=2, label="Data"
+            )
+
+        # 线性拟合
+        if len(valid_df) > 1:
+            X = valid_df["reflection_times_norm"].values.reshape(-1, 1)
+            y = valid_df[metric].values
+            reg = LinearRegression().fit(X, y)
+
+            # 生成拟合直线的x值
+            x_range = np.linspace(valid_df["reflection_times_norm"].min(), valid_df["reflection_times_norm"].max(), 100)
+            y_pred = reg.predict(x_range.reshape(-1, 1))
+
+            # 绘制拟合直线
+            plt.plot(
+                x_range,
+                y_pred,
+                "--",
+                color="red",
+                alpha=0.7,
+                linewidth=2,
+                label=f"Fit: y={reg.coef_[0]:.3f}x+{reg.intercept_:.3f}",
+            )
+
         plt.xlabel("Normalized Reflection Times")
         plt.ylabel(ylabel)
-        plt.title(
-            f"Spearmanr Corr: {corr:.2f}\np: {p_value:.2g} {'(Significant)' if significant else '(Not Significant)'}"
-        )
+        plt.title(f"Corr: {corr:.2f}, p: {p_value:.2g} ({'Significant' if significant else 'Not Significant'})")
+        plt.legend()
+
     plt.tight_layout()
     plt.savefig(f"figures/reflection-{model.series_name.lower()}-{dataset}.pdf")
-    plt.show()
+    # plt.show()
+
+    # 打印过滤信息
+    print(f"原始数据点数: {len(grouped)}")
+    print(f"过滤后数据点数: {len(grouped_filtered)}")
+    print(f"过滤掉的数据点占比: {(len(grouped) - len(grouped_filtered)) / len(grouped) * 100:.1f}%")
 
 
 if __name__ == "__main__":
