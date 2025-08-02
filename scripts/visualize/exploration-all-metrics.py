@@ -1,5 +1,87 @@
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib import hatch
+from matplotlib.patches import Rectangle
+
+plt.rcParams["font.family"] = "Times New Roman"
+plt.rcParams["font.size"] = 10
+
+
+def _create_and_save_legend():
+    """创建并保存单独的图例"""
+    fig_legend, ax_legend = plt.subplots(figsize=(4, 1.2))  # 恢复原来的高度1.2，保持宽度6
+    ax_legend.axis("off")
+
+    # 第一行：颜色对应的指标
+    metrics = ["Precision (↑)", "Recall (↑)", "ECE (↓)", "CSR (↑)       ", "ESC (↑)   ", "NSD (↑)"]
+    metric_colors = ["tab:blue", "tab:orange", "tab:green", "tab:red", "tab:purple", "tab:brown"]
+
+    handles_metrics = []
+    labels_metrics = []
+
+    # 添加指标颜色（第一行）
+    for metric, color in zip(metrics, metric_colors):
+        handle = Rectangle(
+            (0, 0), 1, 1, facecolor=color, edgecolor="black", linewidth=0.8, alpha=0.7
+        )  # 添加与主图一致的透明度
+        handles_metrics.append(handle)
+        labels_metrics.append(metric)
+
+    # 第二行：方法对应的花纹
+    handles_methods = []
+    labels_methods = []
+
+    # Short-CoT (实心柱子)
+    handle1 = Rectangle((0, 0), 1, 1, facecolor="gray", edgecolor="black", linewidth=0.8, alpha=0.7)
+    handles_methods.append(handle1)
+    labels_methods.append("Short-CoT")
+
+    # w/ Exploration (带花纹的柱子)
+    handle2 = Rectangle((0, 0), 1, 1, facecolor="gray", edgecolor="black", linewidth=0.8, hatch="ooooo", alpha=0.5)
+    handles_methods.append(handle2)
+    labels_methods.append("w/ Exploration")
+
+    # 创建第一行图例（指标颜色）- 分成两行显示
+    # 第一行：前3个指标
+    legend1 = ax_legend.legend(
+        handles_metrics[:3],
+        labels_metrics[:3],
+        loc="upper center",
+        bbox_to_anchor=(0.5, 0.90),  # 第一行指标图例位置
+        frameon=True,
+        ncol=3,
+    )
+
+    # 添加第一个图例到axes
+    ax_legend.add_artist(legend1)
+
+    # 第二行：后3个指标
+    legend2 = ax_legend.legend(
+        handles_metrics[3:],
+        labels_metrics[3:],
+        loc="upper center",
+        bbox_to_anchor=(0.5, 0.60),  # 第二行指标图例位置
+        frameon=True,
+        ncol=3,
+    )
+
+    # 添加第二个图例到axes
+    ax_legend.add_artist(legend2)
+
+    # 第三行图例（方法花纹）
+    legend3 = ax_legend.legend(
+        handles_methods,
+        labels_methods,
+        loc="upper center",
+        bbox_to_anchor=(0.5, 0.30),  # 调整方法图例位置
+        frameon=True,
+        ncol=2,
+    )
+
+    # 保存单独的图例
+    plt.savefig("figures/exploration-all-qwen-timetabling-legend.pdf", bbox_inches="tight")
+    # plt.show()
+
 
 # 柱状图比 Short-CoT 和 Exploration 的各种指标
 if __name__ == "__main__":
@@ -25,73 +107,85 @@ if __name__ == "__main__":
     }
 
     # 准备数据进行绘图
-    metrics = ["Precision (↑)", "Recall (↑)", "ECE (↓)", "CSR (↑)", "ESC (↑)", "NSD (↑)"]
+    metrics = ["Precision", "Recall", "ECE", "CSR", "ESC", "NSD"]
     short_cot_values = [37.25, 3.68, 95.51, 43.15, 65.22, 0.19]
     exploration_values = [61.31, 6.76, 93.59, 76.93, 39.47, 0.25]
 
     # 设置图形
     x = np.arange(len(metrics))
-    width = 0.35
+    width = 0.30  # 更细的柱子
 
-    # 颜色映射
-    color_map = {"Short-CoT": "tab:orange", "w/ Exploration": "tab:green"}
-    edge_color_map = {"Short-CoT": "black", "w/ Exploration": "black"}
+    # 为每个指标设置相同的颜色
+    metric_colors = ["tab:blue", "tab:orange", "tab:green", "tab:red", "tab:purple", "tab:brown"]
 
-    # 创建柱状图
-    plt.figure(figsize=(6, 3))
+    # 在创建图形之前设置花纹属性
+    plt.rcParams["hatch.color"] = "white"
+    plt.rcParams["hatch.linewidth"] = 0.8  # 调整花纹线条粗细
+
+    # 创建窄图
+    plt.figure(figsize=(3, 3))
     bars1 = plt.bar(
         x - width / 2,
         short_cot_values,
         width,
         label="Short-CoT",
-        alpha=0.6,
-        color=color_map["Short-CoT"],
-        edgecolor=edge_color_map["Short-CoT"],
-        linewidth=1,
+        color=metric_colors,
+        edgecolor="black",
+        linewidth=0.8,
+        alpha=0.7,
     )
     bars2 = plt.bar(
         x + width / 2,
         exploration_values,
         width,
         label="w/ Exploration",
-        alpha=0.6,
-        color=color_map["w/ Exploration"],
-        edgecolor=edge_color_map["w/ Exploration"],
-        linewidth=1,
+        color=metric_colors,
+        edgecolor="black",
+        linewidth=0.8,
+        hatch="ooooo",  # 使用斜线花纹，可能更明显
+        alpha=0.5,  # 稍微降低透明度以突出花纹
     )
 
     plt.xlabel("Metrics")
     plt.ylabel("Values (%)")
-    plt.title("Short-CoT vs w/ Exploration on TimeTabling")
-    plt.xticks(x, metrics, fontsize=10)
-    plt.legend()
-    plt.grid(True, alpha=0.3, axis="y")
+    plt.title("Short-CoT vs w/ Exploration")
+    plt.xticks(x, metrics, fontsize=9, rotation=20, ha="right")
+    # 不添加图例到主图
+    plt.grid(True, alpha=0.5, axis="y")
 
-    # 在柱子上添加数值标签
-    for bar in bars1:
+    # 在柱子上添加数值标签，手动调整位置避免重叠
+    label_offsets_short = [-0.13, -0.08, -0.15, -0.13, 0, -0.08]  # Short-CoT柱子标签的左右偏移量
+    label_offsets_exploration = [0, +0.08, +0.15, 0, +0.13, +0.08]  # w/ Exploration柱子标签的左右偏移量
+
+    for i, bar in enumerate(bars1):
         height = bar.get_height()
         plt.text(
-            bar.get_x() + bar.get_width() / 2.0,
+            bar.get_x() + bar.get_width() / 2.0 + label_offsets_short[i],  # 添加手动偏移
             height + max(short_cot_values + exploration_values) * 0.01,
             f"{height:.1f}",
             ha="center",
             va="bottom",
-            fontsize=9,
+            fontsize=8,
         )
-    for bar in bars2:
+    for i, bar in enumerate(bars2):
         height = bar.get_height()
         plt.text(
-            bar.get_x() + bar.get_width() / 2.0,
+            bar.get_x() + bar.get_width() / 2.0 + label_offsets_exploration[i],  # 添加手动偏移
             height + max(short_cot_values + exploration_values) * 0.01,
             f"{height:.1f}",
             ha="center",
             va="bottom",
-            fontsize=9,
+            fontsize=8,
         )
 
     # 调整y轴上限以确保标签不被截断
     plt.ylim(0, max(short_cot_values + exploration_values) * 1.15)
 
     plt.tight_layout()
-    plt.savefig("figures/exploration-all-qwen-timetabling.pdf")
+
+    # 保存无图例的主图
+    plt.savefig("figures/exploration-all-qwen-timetabling-main.pdf", bbox_inches="tight")
     # plt.show()
+
+    # 创建并保存单独的图例
+    _create_and_save_legend()

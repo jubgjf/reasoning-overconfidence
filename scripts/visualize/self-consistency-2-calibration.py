@@ -3,9 +3,13 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.lines import Line2D
 
 from confidence.dataset import DatasetName
 from confidence.model import ModelName
+
+plt.rcParams["font.family"] = "Times New Roman"
+plt.rcParams["font.size"] = 10
 
 
 def load_self_consistency_data(data_path: str) -> pd.DataFrame:
@@ -92,7 +96,7 @@ def plot_calibration_charts(
             continue
 
         # 为每个方法创建单独的图
-        fig, ax = plt.subplots(1, 1, figsize=(4, 4))
+        fig, ax = plt.subplots(1, 1, figsize=(3, 3))
 
         group = grouped[grouped["method"] == method]
         color = color_map[method]
@@ -118,9 +122,9 @@ def plot_calibration_charts(
         # elif method == "Self-Consistency (min confidence)":
         #     method_short_name = "w/ min confidence"
         elif method == "Self-Consistency (median confidence)":
-            method_short_name = "w/ median confidence"
+            method_short_name = "w/ median conf"
         elif method == "Self-Consistency (majority voting)":
-            method_short_name = "w/ majority voting"
+            method_short_name = "w/ voting"
         else:
             raise ValueError(f"Unknown method: {method}")
 
@@ -143,14 +147,14 @@ def plot_calibration_charts(
         ax.set_ylim(0, 1)
         ax.set_title(f"Self-Consistency ({method_short_name})")
         ax.grid(True)
-        ax.legend()
+        # 不添加图例到主图
 
         plt.tight_layout(rect=(0, 0, 1, 0.96))
 
         if save_fig:
             # 为每个方法生成单独的文件名
             method_suffix = method_short_name.replace(" ", "-").replace("/", "-").lower()
-            output_filename = f"self-consistency-{model_name.lower()}-{dataset_name.lower()}-{method_suffix}-recall.pdf"
+            output_filename = f"self-consistency-{model_name.lower()}-{dataset_name.lower()}-{method_suffix}-recall-main.pdf"
             output_path = os.path.join(output_dir, output_filename)
             plt.savefig(output_path)
             print(f"Figure saved to: {output_path}")
@@ -159,6 +163,47 @@ def plot_calibration_charts(
             plt.show()
         else:
             plt.close()
+
+    # 在循环结束后创建并保存共用的图例
+    if save_fig:
+        _create_and_save_legend(color_map, dataset_name, output_dir)
+
+
+def _create_and_save_legend(color_map: dict, dataset_name: str, output_dir: str):
+    """创建并保存单独的图例"""
+    fig_legend, ax_legend = plt.subplots(figsize=(5, 0.2))
+    ax_legend.axis("off")
+
+    # 重新创建图例项
+    handles = []
+    labels = []
+
+    # 为每种方法创建图例项
+    method_names = [
+        ("Long-CoT", "Long-CoT"),
+        ("Self-Consistency (median confidence)", "w/ median conf"),
+        ("Self-Consistency (majority voting)", "w/ voting"),
+    ]
+
+    for method_full_name, method_short_name in method_names:
+        if method_full_name in color_map:
+            color = color_map[method_full_name]
+            handle = Line2D([0], [0], marker="o", color=color, linewidth=2, markersize=6, label=method_short_name)
+            handles.append(handle)
+            labels.append(method_short_name)
+
+    # 添加完美校准线
+    handles.append(Line2D([0], [0], linestyle="--", color="gray", label="Perfectly Calibrated"))
+    labels.append("Perfectly Calibrated")
+
+    ax_legend.legend(handles, labels, loc="center", frameon=True, ncol=len(handles))
+
+    # 保存单独的图例
+    legend_filename = f"self-consistency-{dataset_name.lower()}-recall-legend.pdf"
+    legend_path = os.path.join(output_dir, legend_filename)
+    plt.savefig(legend_path, bbox_inches="tight")
+    print(f"Legend saved to: {legend_path}")
+    plt.close()
 
 
 def main():

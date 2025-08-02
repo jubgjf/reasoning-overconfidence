@@ -107,7 +107,7 @@ async def main():
         ax.legend()
     axes[0].set_ylabel("Recall")
     # plt.suptitle("Short-CoT vs Exploration Calibration")
-    plt.tight_layout(rect=(0, 0, 1, 0.96))
+    plt.tight_layout()
     plt.savefig(f"figures/exploration-qwen-{dataset}.pdf")
     plt.show()
 

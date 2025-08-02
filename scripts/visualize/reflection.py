@@ -14,6 +14,10 @@ from confidence.logger import Logger
 from confidence.model import ModelName
 
 
+plt.rcParams["font.family"] = "Times New Roman"
+plt.rcParams["font.size"] = 10
+
+
 def count_reflections(history_thinking_content: str) -> int:
     reflection_patterns = [
         r"^Wait,.*\n\n",

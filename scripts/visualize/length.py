@@ -11,6 +11,9 @@ from confidence.evaluate import add_confidence_column, prf
 from confidence.logger import Logger
 from confidence.model import ModelName
 
+plt.rcParams["font.family"] = "Times New Roman"
+plt.rcParams["font.size"] = 10
+
 
 async def main():
     model = ModelName.QWEN3_8B_THINK
@@ -43,7 +46,7 @@ async def main():
     df["model_thinking_response"] = df["thinking_history"].apply(lambda x: x[1])
     df["model_thinking_length"] = df["model_thinking_response"].apply(lambda x: len(tokenizer.encode(x)))
 
-    plt.figure(figsize=(6, 3))
+    plt.figure(figsize=(3, 3))
     df["length_bin"] = pd.cut(df["model_thinking_length"], bins=10, include_lowest=True)
     length_grouped = df.groupby("length_bin", observed=False)["model_confidence_extracted"].mean().reset_index()
     length_grouped["length_center"] = length_grouped["length_bin"].apply(lambda x: x.mid)
@@ -84,7 +87,7 @@ async def main():
         "--",
         color="red",
         linewidth=2,
-        label=f"Log-linear fit (Pearson Corr={corr_coefficient:.3f})",
+        label="Log-linear fit",
     )
 
     plt.xscale("log")
@@ -97,7 +100,8 @@ async def main():
     # 生成规律的刻度位置：1, 2, 5, 10, 20, 50, 100, ...
     tick_positions = []
     for exp in range(int(log_min), int(log_max) + 2):
-        for base in [1, 2, 5]:
+        for base in [2, 5]:
+            # for base in [1, 2, 5]:
             tick_val = base * (10**exp)
             if x_min <= tick_val <= x_max * 1.5:  # 稍微扩展范围以包含边界值
                 tick_positions.append(tick_val)
@@ -106,9 +110,11 @@ async def main():
 
     plt.xticks(tick_positions, [f"{x / 1000:.1f}×10³" if x >= 1000 else f"{int(x)}" for x in tick_positions])
 
-    plt.xlabel("Model Thinking Length (tokens)")
+    plt.xlabel("Model Thinking Length (Tokens)")
     plt.ylabel("Model Confidence")
-    # plt.title("Thinking Length vs Confidence with Linear Fit")
+    plt.title(
+        f"Corr: {corr_coefficient:.2f}, p: {p_value:.2g}\n({'Significant' if significant else 'Not Significant'})"
+    )
     plt.legend(loc="best")
 
     # 打印统计结果

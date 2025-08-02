@@ -8,6 +8,9 @@ from confidence.evaluate import add_confidence_column, ece, prf
 from confidence.logger import Logger
 from confidence.model import ModelName
 
+plt.rcParams["font.family"] = "Times New Roman"
+plt.rcParams["font.size"] = 10
+
 
 async def main():
     model = ModelName.QWEN3_8B_NO_THINK
@@ -46,7 +49,7 @@ async def main():
 
     # 绘制 Recall vs Temperature 和 ECE vs Temperature 在同一个图中
     fig, (ax1_top, ax1_bottom) = plt.subplots(
-        2, 1, figsize=(6, 3), sharex=True, gridspec_kw={"height_ratios": [1, 1], "hspace": 0.15}
+        2, 1, figsize=(3, 3), sharex=True, gridspec_kw={"height_ratios": [1, 1], "hspace": 0.15}
     )
 
     # 上半部分 - 显示 0.8-1.0 范围
@@ -94,8 +97,8 @@ async def main():
     ax1_bottom.plot((1 - d, 1 + d), (1 - d, 1 + d), **kwargs)
 
     # 添加整体的y轴标签
-    fig.text(0.02, 0.55, "Recall", va="center", rotation="vertical", color=color1, fontsize=12)
-    fig.text(0.96, 0.55, "ECE (r)", va="center", rotation="vertical", color=color2, fontsize=12)
+    fig.text(0.02, 0.52, "Recall", va="center", rotation="vertical", color=color1, fontsize=10)
+    fig.text(0.94, 0.52, "ECE (r)", va="center", rotation="vertical", color=color2, fontsize=10)
 
     # 添加图例到上半部分
     lines1, labels1 = ax1_top.get_legend_handles_labels()
@@ -109,7 +112,7 @@ async def main():
             legend.remove()
 
     plt.tight_layout()
-    plt.subplots_adjust(left=0.12, right=0.88, bottom=0.18, top=0.95)
+    plt.subplots_adjust(left=0.17, right=0.83, bottom=0.18, top=0.85)
     plt.savefig(f"figures/temperature-{model.series_name.lower()}-{dataset.name.lower()}-recall-ece.pdf")
     # plt.show()
 
