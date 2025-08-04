@@ -67,7 +67,10 @@ async def main():
     ax2_top = ax1_top.twinx()
     sns.lineplot(data=df, x="temperature", y="ece", color=color2, marker="s", label="ECE", ax=ax2_top, ci=None)
     ax2_top.tick_params(axis="y", labelcolor=color2)
-    ax2_top.set_ylim(0.8, 1.0)
+    if dataset == DatasetName.TimeTabling:
+        ax2_top.set_ylim(0.8, 1.0)
+    elif dataset == DatasetName.SubsetSum:
+        ax2_top.set_ylim(0.5, 1.0)
     ax2_top.set_ylabel("")  # 移除默认的y轴标签
 
     # 下半部分 - 显示 0-0.2 范围
@@ -83,7 +86,10 @@ async def main():
     ax2_bottom = ax1_bottom.twinx()
     sns.lineplot(data=df, x="temperature", y="ece", color=color2, marker="s", ax=ax2_bottom, ci=None)
     ax2_bottom.tick_params(axis="y", labelcolor=color2)
-    ax2_bottom.set_ylim(0, 0.2)
+    if dataset == DatasetName.TimeTabling:
+        ax2_bottom.set_ylim(0, 0.2)
+    elif dataset == DatasetName.SubsetSum:
+        ax2_bottom.set_ylim(0, 0.5)
     ax2_bottom.set_ylabel("")  # 移除默认的y轴标签
 
     # 添加断轴标记

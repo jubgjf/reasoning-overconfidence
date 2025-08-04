@@ -83,34 +83,11 @@ def _create_and_save_legend():
     # plt.show()
 
 
-# 柱状图比 Short-CoT 和 Exploration 的各种指标
-if __name__ == "__main__":
-    # \toprule
-    # Dataset                      & Method         & Precision (\%) $\uparrow$ & Recall (\%) $\uparrow$ & ECE (r) ($\downarrow$) & CSR (\%) $\uparrow$ & ESC (\%) $\uparrow$ & NSD (\%) $\uparrow$ \\
-    # \midrule
-    # \multirow{2}{*}{TimeTabling} & Short-CoT      & 37.25                     & 3.68                   & 95.51                  & 43.15               & \textbf{65.22}      & 0.19                \\
-    #                              & w/ Exploration & \textbf{61.31}            & \textbf{6.76}          & \textbf{93.59}         & \textbf{76.93}      & 39.47               & \textbf{0.25}       \\
-    # \midrule
-    # \multirow{2}{*}{SubsetSum}   & Short-CoT      & 4.51                      & 2.19                   & \textbf{56.44}         & 14.89               & \textbf{15.63}      & \textbf{0.20}       \\
-    #                              & w/ Exploration & \textbf{4.64}             & \textbf{2.21}          & 80.36                  & \textbf{16.35}      & 12.10               & 0.00                \\
-    # \bottomrule
-
-    # TimeTabling数据集数据
-    timetabling_data = {
-        "Method": ["Short-CoT", "w/ Exploration"],
-        "Precision (%)": [37.25, 61.31],
-        "Recall (%)": [3.68, 6.76],
-        "ECE (r)": [95.51, 93.59],
-        "CSR (%)": [43.15, 76.93],
-        "ESC (%)": [65.22, 39.47],
-        "NSD (%)": [0.19, 0.25],
-    }
-
+def _plot_dataset(dataset_name, short_cot_values, exploration_values, filename_prefix):
+    """绘制单个数据集的柱状图"""
     # 准备数据进行绘图
     metrics = ["Precision", "Recall", "ECE", "CSR", "ESC", "NSD"]
-    short_cot_values = [37.25, 3.68, 95.51, 43.15, 65.22, 0.19]
-    exploration_values = [61.31, 6.76, 93.59, 76.93, 39.47, 0.25]
-
+    
     # 设置图形
     x = np.arange(len(metrics))
     width = 0.30  # 更细的柱子
@@ -154,15 +131,19 @@ if __name__ == "__main__":
     plt.grid(True, alpha=0.5, axis="y")
 
     # 在柱子上添加数值标签，手动调整位置避免重叠
-    label_offsets_short = [-0.13, -0.08, -0.15, -0.13, 0, -0.08]  # Short-CoT柱子标签的左右偏移量
-    label_offsets_exploration = [0, +0.08, +0.15, 0, +0.13, +0.08]  # w/ Exploration柱子标签的左右偏移量
+    if dataset_name == "TimeTabling":
+        label_offsets_short = [-0.13, -0.08, -0.15, -0.13, 0, -0.08]  # Short-CoT柱子标签的左右偏移量
+        label_offsets_exploration = [0, +0.08, +0.15, 0, +0.13, +0.08]  # w/ Exploration柱子标签的左右偏移量
+    else:  # SubsetSum
+        label_offsets_short = [-0.08, -0.08, -0.13, -0.08, 0, -0.08]  # Short-CoT柱子标签的左右偏移量
+        label_offsets_exploration = [+0.08, +0.08, +0.13, +0.08, +0.08, +0.08]  # w/ Exploration柱子标签的左右偏移量
 
     for i, bar in enumerate(bars1):
         height = bar.get_height()
         plt.text(
             bar.get_x() + bar.get_width() / 2.0 + label_offsets_short[i],  # 添加手动偏移
             height + max(short_cot_values + exploration_values) * 0.01,
-            f"{height:.1f}",
+            f"{height:.2f}" if height < 10 else f"{height:.1f}",
             ha="center",
             va="bottom",
             fontsize=8,
@@ -172,7 +153,7 @@ if __name__ == "__main__":
         plt.text(
             bar.get_x() + bar.get_width() / 2.0 + label_offsets_exploration[i],  # 添加手动偏移
             height + max(short_cot_values + exploration_values) * 0.01,
-            f"{height:.1f}",
+            f"{height:.2f}" if height < 10 else f"{height:.1f}",
             ha="center",
             va="bottom",
             fontsize=8,
@@ -184,8 +165,53 @@ if __name__ == "__main__":
     plt.tight_layout()
 
     # 保存无图例的主图
-    plt.savefig("figures/exploration-all-qwen-timetabling-main.pdf", bbox_inches="tight")
-    # plt.show()
+    plt.savefig(f"figures/{filename_prefix}-main.pdf", bbox_inches="tight")
+    plt.close()  # 关闭当前图形以释放内存
+
+
+# 柱状图比较 Short-CoT 和 Exploration 的各种指标
+if __name__ == "__main__":
+    # \toprule
+    # Dataset                      & Method         & Precision (\%) $\uparrow$ & Recall (\%) $\uparrow$ & ECE (r) ($\downarrow$) & CSR (\%) $\uparrow$ & ESC (\%) $\uparrow$ & NSD (\%) $\uparrow$ \\
+    # \midrule
+    # \multirow{2}{*}{TimeTabling} & Short-CoT      & 37.25                     & 3.68                   & 95.51                  & 43.15               & \textbf{65.22}      & 0.19                \\
+    #                              & w/ Exploration & \textbf{61.31}            & \textbf{6.76}          & \textbf{93.59}         & \textbf{76.93}      & 39.47               & \textbf{0.25}       \\
+    # \midrule
+    # \multirow{2}{*}{SubsetSum}   & Short-CoT      & 4.51                      & 2.19                   & \textbf{56.44}         & 14.89               & \textbf{15.63}      & \textbf{0.20}       \\
+    #                              & w/ Exploration & \textbf{4.64}             & \textbf{2.21}          & 80.36                  & \textbf{16.35}      & 12.10               & 0.00                \\
+    # \bottomrule
+
+    # TimeTabling数据集数据
+    timetabling_data = {
+        "Method": ["Short-CoT", "w/ Exploration"],
+        "Precision (%)": [37.25, 61.31],
+        "Recall (%)": [3.68, 6.76],
+        "ECE (r)": [95.51, 93.59],
+        "CSR (%)": [43.15, 76.93],
+        "ESC (%)": [65.22, 39.47],
+        "NSD (%)": [0.19, 0.25],
+    }
+
+    # SubsetSum数据集数据
+    subsetsum_data = {
+        "Method": ["Short-CoT", "w/ Exploration"],
+        "Precision (%)": [4.51, 4.64],
+        "Recall (%)": [2.19, 2.21],
+        "ECE (r)": [56.44, 80.36],
+        "CSR (%)": [14.89, 16.35],
+        "ESC (%)": [15.63, 12.10],
+        "NSD (%)": [0.20, 0.00],
+    }
+
+    # 绘制TimeTabling数据集
+    timetabling_short_cot = [37.25, 3.68, 95.51, 43.15, 65.22, 0.19]
+    timetabling_exploration = [61.31, 6.76, 93.59, 76.93, 39.47, 0.25]
+    _plot_dataset("TimeTabling", timetabling_short_cot, timetabling_exploration, "exploration-all-qwen-timetabling")
+
+    # 绘制SubsetSum数据集
+    subsetsum_short_cot = [4.51, 2.19, 56.44, 14.89, 15.63, 0.20]
+    subsetsum_exploration = [4.64, 2.21, 80.36, 16.35, 12.10, 0.00]
+    _plot_dataset("SubsetSum", subsetsum_short_cot, subsetsum_exploration, "exploration-all-qwen-subsetsum")
 
     # 创建并保存单独的图例
     _create_and_save_legend()

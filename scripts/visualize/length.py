@@ -112,9 +112,7 @@ async def main():
 
     plt.xlabel("Model Thinking Length (Tokens)")
     plt.ylabel("Model Confidence")
-    plt.title(
-        f"Corr: {corr_coefficient:.2f}, p: {p_value:.2g}\n({'Significant' if significant else 'Not Significant'})"
-    )
+    plt.title(f"Corr: {corr_coefficient:.2f}, p: {p_value:.2g}\n({significant})")
     plt.legend(loc="best")
 
     # 打印统计结果

@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.lines import Line2D
 from pydantic import BaseModel
 from tortoise import run_async
 
@@ -39,6 +40,8 @@ async def main():
             Setting(model=ModelName.GPT_4O_MINI, template="cot"),
         ],
     ]
+
+    color_map = {"Long-CoT": "tab:blue", "Short-CoT": "tab:orange"}  # 在函数开始定义color_map
 
     # 遍历每个设置组
     for settings in settings_group:
@@ -90,12 +93,12 @@ async def main():
         plt.figure(figsize=(3, 3))
         bin_edges = np.linspace(0, 1, 11)
         bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-        bar_width = 0.035
 
-        color_map = {"Long-CoT": "tab:blue", "Short-CoT": "tab:orange"}
+        ece_legend_items = []  # 用于存储ECE图例项
+        
         for i, (setting_name, group) in enumerate(grouped.groupby("setting")):
             # 提取原始名称用于配色
-            if "Long-CoT" in setting_name:
+            if "Long-CoT" in str(setting_name):
                 color = color_map["Long-CoT"]
             else:
                 color = color_map["Short-CoT"]
@@ -124,6 +127,8 @@ async def main():
             )
             plt.plot(bin_centers[valid], mean_accuracys[valid], marker="o", linestyle="-", linewidth=2, color=color)
 
+            # 收集ECE值用于图例
+            ece_legend_items.append((setting_name, ece_value, color))
             print(f"{setting_name} (ECE={ece_value:.2f})")
 
         plt.plot([0, 1], [0, 1], linestyle="--", color="gray", label="Perfectly Calibrated")
@@ -133,7 +138,18 @@ async def main():
         plt.ylim(0, 1)
         plt.title(f"{model_series_name} on {dataset.name}")
         plt.grid(True)
-        # 不添加图例到主图
+        
+        # 添加ECE值图例到右上角
+        ece_legend_text = []
+        for setting_name, ece_value, color in ece_legend_items:
+            ece_legend_text.append(f"{setting_name}: ECE={ece_value:.2f}%")
+        
+        # 在左上角添加文本框显示ECE值
+        legend_text = '\n'.join(ece_legend_text)
+        plt.text(0.05, 0.95, legend_text, transform=plt.gca().transAxes, 
+                verticalalignment='top', horizontalalignment='left',
+                bbox=dict(boxstyle='round', facecolor='white', alpha=0.8),
+                fontsize=9)
 
         plt.tight_layout()
 
@@ -157,12 +173,12 @@ def _create_and_save_legend(color_map, dataset):
     # 为每种CoT类型创建图例项
     for setting_name in ["Long-CoT", "Short-CoT"]:
         color = color_map[setting_name]
-        handle = plt.Line2D([0], [0], marker="o", color=color, linewidth=2, markersize=6, label=setting_name)
+        handle = Line2D([0], [0], marker="o", color=color, linewidth=2, markersize=6, label=setting_name)
         handles.append(handle)
         labels.append(setting_name)
 
     # 添加完美校准线
-    handles.append(plt.Line2D([0], [0], linestyle="--", color="gray", label="Perfectly Calibrated"))
+    handles.append(Line2D([0], [0], linestyle="--", color="gray", label="Perfectly Calibrated"))
     labels.append("Perfectly Calibrated")
 
     ax_legend.legend(handles, labels, loc="center", frameon=True, ncol=3)

@@ -122,9 +122,9 @@ def plot_calibration_charts(
         # elif method == "Self-Consistency (min confidence)":
         #     method_short_name = "w/ min confidence"
         elif method == "Self-Consistency (median confidence)":
-            method_short_name = "w/ median conf"
+            method_short_name = "w/ Median Conf"
         elif method == "Self-Consistency (majority voting)":
-            method_short_name = "w/ voting"
+            method_short_name = "w/ Voting"
         else:
             raise ValueError(f"Unknown method: {method}")
 
@@ -154,7 +154,9 @@ def plot_calibration_charts(
         if save_fig:
             # 为每个方法生成单独的文件名
             method_suffix = method_short_name.replace(" ", "-").replace("/", "-").lower()
-            output_filename = f"self-consistency-{model_name.lower()}-{dataset_name.lower()}-{method_suffix}-recall-main.pdf"
+            output_filename = (
+                f"self-consistency-{model_name.lower()}-{dataset_name.lower()}-{method_suffix}-recall-main.pdf"
+            )
             output_path = os.path.join(output_dir, output_filename)
             plt.savefig(output_path)
             print(f"Figure saved to: {output_path}")
@@ -181,8 +183,8 @@ def _create_and_save_legend(color_map: dict, dataset_name: str, output_dir: str)
     # 为每种方法创建图例项
     method_names = [
         ("Long-CoT", "Long-CoT"),
-        ("Self-Consistency (median confidence)", "w/ median conf"),
-        ("Self-Consistency (majority voting)", "w/ voting"),
+        ("Self-Consistency (median confidence)", "w/ Median Conf"),
+        ("Self-Consistency (majority voting)", "w/ Voting"),
     ]
 
     for method_full_name, method_short_name in method_names:

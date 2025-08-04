@@ -2,7 +2,6 @@ import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy as np
 
-
 plt.rcParams["font.family"] = "Times New Roman"
 plt.rcParams["font.size"] = 10
 
@@ -44,6 +43,17 @@ if __name__ == "__main__":
     #     GPT
     #         Long-CoT (Recall=9.60)
     #         Short-CoT (Recall=1.88)
+    # SubsetSum
+    # Recall (result from performance.py):
+    #     Qwen
+    #         Long-CoT (Recall=21.24)
+    #         Short-CoT (Recall=2.19)
+    #     DeepSeek
+    #         Long-CoT (Recall=22.43)
+    #         Short-CoT (Recall=19.40)
+    #     GPT
+    #         Long-CoT (Recall=23.15)
+    #         Short-CoT (Recall=2.34)
 
     # 组织数据
     models = ["Qwen", "DeepSeek", "GPT"]
@@ -110,3 +120,78 @@ if __name__ == "__main__":
 
     # 创建并保存图例
     _create_and_save_legend(color_map)
+
+    # SubsetSum 图形
+    # Recall 数据 (SubsetSum)
+    subsetsum_recall_long_cot = [21.24, 22.43, 23.15]
+    subsetsum_recall_short_cot = [2.19, 19.40, 2.34]
+
+    plt.figure(figsize=(3, 3))
+    bars5 = plt.bar(
+        x - width / 2,
+        subsetsum_recall_long_cot,
+        width,
+        label="Long-CoT",
+        alpha=0.6,
+        color=color_map["Long-CoT"],
+        edgecolor=edge_color_map["Long-CoT"],
+        linewidth=1,
+    )
+    bars6 = plt.bar(
+        x + width / 2,
+        subsetsum_recall_short_cot,
+        width,
+        label="Short-CoT",
+        alpha=0.6,
+        color=color_map["Short-CoT"],
+        edgecolor=edge_color_map["Short-CoT"],
+        linewidth=1,
+    )
+
+    plt.xlabel("Model")
+    plt.ylabel("Recall")
+    plt.title("Models on SubsetSum")
+    plt.xticks(x, models)
+    # 不添加图例到主图
+    plt.grid(True, alpha=0.3, axis="y")
+
+    # 在柱子上添加数值标签
+    for bar in bars5:
+        height = bar.get_height()
+        plt.text(
+            bar.get_x() + bar.get_width() / 2.0, height + 0.5, f"{height:.1f}", ha="center", va="bottom", fontsize=8.5
+        )
+    for bar in bars6:
+        height = bar.get_height()
+        plt.text(
+            bar.get_x() + bar.get_width() / 2.0, height + 0.5, f"{height:.1f}", ha="center", va="bottom", fontsize=8.5
+        )
+
+    # 调整y轴上限以确保标签不被截断
+    plt.ylim(0, max(max(subsetsum_recall_long_cot) * 1.2, max(subsetsum_recall_short_cot)) * 1.2)
+
+    plt.tight_layout()
+    plt.savefig("figures/short-long-cot-subsetsum-recall-main.pdf", bbox_inches="tight")
+    # plt.show()
+
+    # SubsetSum 图例 (可以复用相同的图例)
+    plt.figure(figsize=(3, 0.2))
+    plt.axis("off")
+
+    # 重新创建图例项
+    handles = []
+    labels = []
+
+    # 为每种CoT类型创建图例项
+    for setting_name in ["Long-CoT", "Short-CoT"]:
+        color = color_map[setting_name]
+        # 创建矩形图例项（用于柱状图）
+        handle = patches.Rectangle((0, 0), 1, 1, facecolor=color, edgecolor="black", alpha=0.6)
+        handles.append(handle)
+        labels.append(setting_name)
+
+    plt.legend(handles, labels, loc="center", frameon=True, ncol=2)
+
+    # 保存SubsetSum的图例
+    plt.savefig("figures/short-long-cot-subsetsum-legend.pdf", bbox_inches="tight")
+    # plt.show()

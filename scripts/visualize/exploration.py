@@ -1,12 +1,16 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.lines import Line2D
 from tortoise import run_async
 
 from confidence.dataset import DatasetName
 from confidence.evaluate import add_confidence_column, ece_by_groups, prf, show_metrics
 from confidence.logger import Logger
 from confidence.model import ModelName
+
+plt.rcParams["font.family"] = "Times New Roman"
+plt.rcParams["font.size"] = 10
 
 
 async def main():
@@ -45,11 +49,21 @@ async def main():
     show_metrics(short_cot_df, "Short-CoT Baseline")
 
     exploration_df = df[df["scaling"] == "exploration"].copy()
-    show_metrics(exploration_df, "Exploration")
+    show_metrics(exploration_df, "w/ Exploration")
 
     # 使用 evaluate.py 中的 ECE 计算函数
     ece_dict = ece_by_groups(df, "scaling", "recall")
-    df["scaling_label"] = df["scaling"].apply(lambda s: f"{s.capitalize()} (ECE={ece_dict[s] * 100:.2f})")
+    
+    # 创建正确的标签映射
+    def get_display_label(scaling_type):
+        if scaling_type == "short-cot":
+            return f"Short-CoT (ECE={ece_dict[scaling_type] * 100:.2f})"
+        elif scaling_type == "exploration":
+            return f"w/ Exploration (ECE={ece_dict[scaling_type] * 100:.2f})"
+        else:
+            return f"{scaling_type.capitalize()} (ECE={ece_dict[scaling_type] * 100:.2f})"
+    
+    df["scaling_label"] = df["scaling"].apply(get_display_label)
 
     # 同样需要归一化置信度用于可视化
     df["confidence_bin"] = pd.cut(df["model_confidence_extracted"], bins=10, include_lowest=True, labels=False)
@@ -63,20 +77,24 @@ async def main():
         .reset_index()
     )
 
-    fig, axes = plt.subplots(1, 2, figsize=(8, 4.5), sharey=True)
     bin_edges = np.linspace(0, 1, 11)
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
 
-    color_map = {"short-cot": "tab:blue", "exploration": "tab:orange"}
-    for ax, (scaling_label, group) in zip(axes, grouped.groupby("scaling_label")):
+    color_map = {"short-cot": "tab:orange", "exploration": "tab:green"}
+    
+    # 分别绘制每个子图
+    for scaling_label, group in grouped.groupby("scaling_label"):
+        plt.figure(figsize=(3, 3))
+        
         # 提取原始名称用于配色
         scaling_label_str = str(scaling_label)
-        if "Short-cot" in scaling_label_str:
+        if "Short-CoT" in scaling_label_str:
             color = color_map["short-cot"]
-        elif "Exploration" in scaling_label_str:
+        elif "w/ Exploration" in scaling_label_str:
             color = color_map["exploration"]
         else:
             color = "tab:gray"  # 默认颜色
+            
         mean_accuracys = np.full(10, np.nan)
         for i in range(10):
             bin_group = group[group["confidence_bin"] == i]
@@ -87,28 +105,64 @@ async def main():
                     continue
                 mean_accuracys[i] = acc
         valid = ~np.isnan(mean_accuracys)
-        ax.bar(
+        
+        plt.bar(
             bin_centers,
             mean_accuracys,
             width=0.07,
             alpha=0.6,
-            label=scaling_label,
             align="center",
             edgecolor="black",
             color=color,
         )
-        ax.plot(bin_centers[valid], mean_accuracys[valid], marker="o", linestyle="-", linewidth=2, color=color)
-        ax.plot([0, 1], [0, 1], linestyle="--", color="gray", label="Perfectly Calibrated")
-        ax.set_xlabel("Confidence")
-        ax.set_xlim(0, 1)
-        ax.set_ylim(0, 1)
-        ax.set_title(f"{scaling_label}")
-        ax.grid(True)
-        ax.legend()
-    axes[0].set_ylabel("Recall")
-    # plt.suptitle("Short-CoT vs Exploration Calibration")
-    plt.tight_layout()
-    plt.savefig(f"figures/exploration-qwen-{dataset}.pdf")
+        plt.plot(bin_centers[valid], mean_accuracys[valid], marker="o", linestyle="-", linewidth=2, color=color)
+        plt.plot([0, 1], [0, 1], linestyle="--", color="gray")
+        plt.xlabel("Confidence")
+        plt.ylabel("Recall")
+        plt.xlim(0, 1)
+        plt.ylim(0, 1)
+        plt.title(f"{scaling_label}")
+        plt.grid(True)
+        plt.tight_layout()
+        
+        # 根据scaling类型保存不同的文件名
+        if "Short-CoT" in scaling_label_str:
+            plt.savefig(f"figures/exploration-{model.series_name.lower()}-{dataset}-short-cot.pdf", bbox_inches="tight")
+        elif "w/ Exploration" in scaling_label_str:
+            plt.savefig(f"figures/exploration-{model.series_name.lower()}-{dataset}-exploration.pdf", bbox_inches="tight")
+        plt.show()
+
+    # 创建并保存单独的图例
+    _create_and_save_legend(color_map, model, dataset)
+
+
+def _create_and_save_legend(color_map, model, dataset):
+    """创建并保存单独的图例"""
+    fig_legend, ax_legend = plt.subplots(figsize=(5, 0.2))
+    ax_legend.axis("off")
+
+    # 重新创建图例项
+    handles = []
+    labels = []
+
+    # 为每种scaling类型创建图例项
+    for scaling_name in ["Short-CoT", "w/ Exploration"]:
+        if scaling_name == "Short-CoT":
+            color = color_map["short-cot"]
+        else:
+            color = color_map["exploration"]
+        handle = Line2D([0], [0], marker="o", color=color, linewidth=2, markersize=6, label=scaling_name)
+        handles.append(handle)
+        labels.append(scaling_name)
+
+    # 添加完美校准线
+    handles.append(Line2D([0], [0], linestyle="--", color="gray", label="Perfectly Calibrated"))
+    labels.append("Perfectly Calibrated")
+
+    ax_legend.legend(handles, labels, loc="center", frameon=True, ncol=3)
+
+    # 保存单独的图例
+    plt.savefig(f"figures/exploration-{model.series_name.lower()}-{dataset}-legend.pdf", bbox_inches="tight")
     plt.show()
 
 
