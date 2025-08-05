@@ -17,7 +17,7 @@ python inference.py                 --model qwen3-8b-no_think --model_name_or_pa
 python inference.py                 --model qwen3-8b-no_think --model_name_or_path Qwen/Qwen3-8B --template cot    --dataset timetabling --concurrency 500 --temperature 0.9 --turn 0
 python inference.py                 --model qwen3-8b-no_think --model_name_or_path Qwen/Qwen3-8B --template cot    --dataset timetabling --concurrency 500 --temperature 1.0 --turn 0
 
-# Short-CoT w/ self-exploration
+# Short-CoT w/ exploration
 python inference-fake-reflection.py --model qwen3-8b-no_think --model_name_or_path Qwen/Qwen3-8B --template cot    --dataset timetabling --concurrency 500 --temperature 0.2 --turn 0 --fake_type more
 
 # Long-CoT
@@ -29,5 +29,5 @@ python inference.py                 --model qwen3-8b-think    --model_name_or_pa
 python inference.py                 --model qwen3-8b-think    --model_name_or_path Qwen/Qwen3-8B --template simple --dataset timetabling --concurrency 500 --temperature 0.2 --turn 3
 python inference.py                 --model qwen3-8b-think    --model_name_or_path Qwen/Qwen3-8B --template simple --dataset timetabling --concurrency 500 --temperature 0.2 --turn 4
 
-# Long-CoT w/o self-reflection
+# Long-CoT w/o reflection
 python inference-fake-reflection.py --model qwen3-8b-think    --model_name_or_path Qwen/Qwen3-8B --template simple --dataset timetabling --concurrency 500 --temperature 0.2 --turn 0 --fake_type less
