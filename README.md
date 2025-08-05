@@ -9,7 +9,19 @@ $ pip install -r requirements.txt
 $ . .venv/bin/activate
 ```
 
-## Reproducing Experiments
+## Run Experiments
+
+### Dataset
+
+`scripts/gen-timetabling.py` and `scripts/gen-subsetsum.py` are used to generate dataset, which will be saved to `dataset/`.
+```shell
+$ export PYTHONPATH=$(pwd)
+$ python scripts/gen-timetabling.py
+```
+
+The dataset used in our paper has already been placed in `dataset/`, and you can use it directly.
+
+### Main Experiments
 
 We provide two program entry points: `inference.py` and `inference-fake-reflection.py`.
 
@@ -85,9 +97,10 @@ $ python inference.py --model qwen3-8b-think --model_name_or_path Qwen/Qwen3-8B 
 $ python inference-fake-reflection.py --model qwen3-8b-think --model_name_or_path Qwen/Qwen3-8B --template simple --dataset timetabling --concurrency 500 --temperature 0.2 --turn 0 --fake_type less
 ```
 
+All experiment logs will be saved to `logs/`
 For convenience, we provide a script `scripts/inference.example.sh` to run experiments above.
 
-## Visualize Results
+### Visualize Results
 
 We provide multiple result visualization scripts, located in `scripts/visualize/*.py`.
 
@@ -105,3 +118,8 @@ $ accelerate launch scripts/visualize/entropy.py --layer 0
 ```
 
 We also provide a script `scripts/entropy.example.sh` for this.
+
+## Reproducibility
+
+We have provided all the experimental logs from this paper in `logs-reproduce/`.
+You can directly use the visualization code to reproduce the results for all figures and tables in the paper.
