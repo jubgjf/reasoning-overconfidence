@@ -13,6 +13,9 @@ from confidence.evaluate import add_confidence_column, prf
 from confidence.logger import Logger
 from confidence.model import ModelName
 
+plt.rcParams["font.family"] = "Times New Roman"
+plt.rcParams["font.size"] = 15
+
 
 class Setting(BaseModel):
     model: ModelName
@@ -75,6 +78,9 @@ async def main():
     fig = plt.figure(figsize=(4, 4))
     ax = fig.add_subplot(111, projection="3d")
 
+    point_size = max(40, int(plt.rcParams["font.size"] * 3))
+    # 定义深色边框颜色
+    edge_palette = {"Short-CoT": "#8B4500", "Long-CoT": "#00008B"}  # 更深的颜色
     for setting, color in palette.items():
         sub = df[df["setting"] == setting]
         ax.scatter(
@@ -84,20 +90,28 @@ async def main():
             c=color,
             label=setting,
             alpha=0.6,
-            edgecolor="k",
-            linewidth=0.0,
+            edgecolor=edge_palette[setting],
+            linewidth=1.0,
+            s=point_size,
         )
 
-    ax.set_xlabel("Confidence")
-    ax.set_ylabel("Completeness")
-    ax.set_zlabel("Frequency")
+    ax.set_xlabel("")
+    ax.set_ylabel("")
+    ax.set_zlabel("")
     ax.set_xlim(-0.05, 1.05)
     ax.set_ylim(-0.05, 1.05)
 
+    # 隐藏坐标轴刻度值
+    ax.set_xticklabels([])
+    ax.set_yticklabels([])
+    ax.set_zticklabels([])
+
     # 调整轴标签位置
-    ax.xaxis.labelpad = 5
-    ax.yaxis.labelpad = 5
-    ax.zaxis.labelpad = -150
+    # 增大轴标签与刻度/数值之间的间距以适应较大的字体
+    ax.xaxis.labelpad = 15
+    ax.yaxis.labelpad = 15
+    # z 轴的 labelpad 在 3D 中通常需要正值来向外移动标签
+    ax.zaxis.labelpad = 15
 
     # 使用subplots_adjust而不是tight_layout
     plt.subplots_adjust(left=0.1, right=0.9, top=0.9, bottom=0.1)

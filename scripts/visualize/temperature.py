@@ -9,7 +9,7 @@ from confidence.logger import Logger
 from confidence.model import ModelName
 
 plt.rcParams["font.family"] = "Times New Roman"
-plt.rcParams["font.size"] = 10
+plt.rcParams["font.size"] = 15
 
 
 async def main():
@@ -57,16 +57,16 @@ async def main():
     color2 = "tab:red"
 
     # 上半部分的左y轴 - Recall
-    sns.lineplot(data=df, x="temperature", y="recall", color=color1, marker="o", label="Recall", ax=ax1_top, ci=None)
-    ax1_top.tick_params(axis="y", labelcolor=color1)
+    sns.lineplot(data=df, x="temperature", y="recall", color=color1, marker="o", ax=ax1_top, ci=None)
+    ax1_top.tick_params(axis="y", labelcolor=color1, labelsize=13)
     ax1_top.set_ylim(0.8, 1.0)
     ax1_top.grid(True, alpha=0.3)
     ax1_top.set_ylabel("")  # 移除默认的y轴标签
 
     # 上半部分的右y轴 - ECE
     ax2_top = ax1_top.twinx()
-    sns.lineplot(data=df, x="temperature", y="ece", color=color2, marker="s", label="ECE", ax=ax2_top, ci=None)
-    ax2_top.tick_params(axis="y", labelcolor=color2)
+    sns.lineplot(data=df, x="temperature", y="ece", color=color2, marker="s", ax=ax2_top, ci=None)
+    ax2_top.tick_params(axis="y", labelcolor=color2, labelsize=13)
     if dataset == DatasetName.TimeTabling:
         ax2_top.set_ylim(0.8, 1.0)
     elif dataset == DatasetName.SubsetSum:
@@ -77,7 +77,8 @@ async def main():
     # 下半部分的左y轴 - Recall
     ax1_bottom.set_xlabel("Temperature")
     sns.lineplot(data=df, x="temperature", y="recall", color=color1, marker="o", ax=ax1_bottom, ci=None)
-    ax1_bottom.tick_params(axis="y", labelcolor=color1)
+    ax1_bottom.tick_params(axis="y", labelcolor=color1, labelsize=13)
+    ax1_bottom.tick_params(axis="x", labelsize=13)
     ax1_bottom.set_ylim(0, 0.2)
     ax1_bottom.grid(True, alpha=0.3)
     ax1_bottom.set_ylabel("")  # 移除默认的y轴标签
@@ -85,7 +86,7 @@ async def main():
     # 下半部分的右y轴 - ECE
     ax2_bottom = ax1_bottom.twinx()
     sns.lineplot(data=df, x="temperature", y="ece", color=color2, marker="s", ax=ax2_bottom, ci=None)
-    ax2_bottom.tick_params(axis="y", labelcolor=color2)
+    ax2_bottom.tick_params(axis="y", labelcolor=color2, labelsize=13)
     if dataset == DatasetName.TimeTabling:
         ax2_bottom.set_ylim(0, 0.2)
     elif dataset == DatasetName.SubsetSum:
@@ -103,19 +104,11 @@ async def main():
     ax1_bottom.plot((1 - d, 1 + d), (1 - d, 1 + d), **kwargs)
 
     # 添加整体的y轴标签
-    fig.text(0.02, 0.52, "Recall", va="center", rotation="vertical", color=color1, fontsize=10)
-    fig.text(0.94, 0.52, "ECE (r)", va="center", rotation="vertical", color=color2, fontsize=10)
+    fig.text(0.005, 0.52, "Recall", va="center", rotation="vertical", color=color1, fontsize=15)
+    fig.text(0.945, 0.52, "ECE (r)", va="center", rotation="vertical", color=color2, fontsize=15)
 
-    # 添加图例到上半部分
-    lines1, labels1 = ax1_top.get_legend_handles_labels()
-    lines2, labels2 = ax2_top.get_legend_handles_labels()
-    ax1_top.legend(lines1 + lines2, labels1 + labels2, loc="lower right")
-
-    # 移除自动生成的图例
-    for ax in [ax1_bottom, ax2_top, ax2_bottom]:
-        legend = ax.get_legend()
-        if legend:
-            legend.remove()
+    # 添加标题
+    fig.suptitle(f"{model.series_name}", fontsize=15, y=0.94)
 
     plt.tight_layout()
     plt.subplots_adjust(left=0.17, right=0.83, bottom=0.18, top=0.85)

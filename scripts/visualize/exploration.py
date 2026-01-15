@@ -10,11 +10,11 @@ from confidence.logger import Logger
 from confidence.model import ModelName
 
 plt.rcParams["font.family"] = "Times New Roman"
-plt.rcParams["font.size"] = 10
+plt.rcParams["font.size"] = 15
 
 
 async def main():
-    dataset = DatasetName.SubsetSum
+    dataset = DatasetName.TimeTabling
     turn = 0
     temperature = 0.2
     model = ModelName.QWEN3_8B_NO_THINK
@@ -121,7 +121,9 @@ async def main():
         plt.ylabel("Recall")
         plt.xlim(0, 1)
         plt.ylim(0, 1)
-        plt.title(f"{scaling_label}")
+        plt.xticks(fontsize=13)
+        plt.yticks(fontsize=13)
+        plt.title(f"{scaling_label}", fontsize=15, pad=10)
         plt.grid(True)
         plt.tight_layout()
         
@@ -130,7 +132,7 @@ async def main():
             plt.savefig(f"figures/exploration-{model.series_name.lower()}-{dataset}-short-cot.pdf", bbox_inches="tight")
         elif "w/ Exploration" in scaling_label_str:
             plt.savefig(f"figures/exploration-{model.series_name.lower()}-{dataset}-exploration.pdf", bbox_inches="tight")
-        plt.show()
+        # plt.show()
 
     # 创建并保存单独的图例
     _create_and_save_legend(color_map, model, dataset)
@@ -163,7 +165,7 @@ def _create_and_save_legend(color_map, model, dataset):
 
     # 保存单独的图例
     plt.savefig(f"figures/exploration-{model.series_name.lower()}-{dataset}-legend.pdf", bbox_inches="tight")
-    plt.show()
+    # plt.show()
 
 
 if __name__ == "__main__":

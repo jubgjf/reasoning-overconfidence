@@ -9,7 +9,7 @@ from confidence.dataset import DatasetName
 from confidence.model import ModelName
 
 plt.rcParams["font.family"] = "Times New Roman"
-plt.rcParams["font.size"] = 10
+plt.rcParams["font.size"] = 15
 
 
 def load_self_consistency_data(data_path: str) -> pd.DataFrame:
@@ -145,11 +145,13 @@ def plot_calibration_charts(
         ax.set_ylabel("Recall")
         ax.set_xlim(0, 1)
         ax.set_ylim(0, 1)
-        ax.set_title(f"Self-Consistency ({method_short_name})")
+        ax.tick_params(axis='x', labelsize=13)
+        ax.tick_params(axis='y', labelsize=13)
+        ax.set_title(f"{method_short_name}", fontsize=15, pad=10)
         ax.grid(True)
         # 不添加图例到主图
 
-        plt.tight_layout(rect=(0, 0, 1, 0.96))
+        plt.tight_layout()
 
         if save_fig:
             # 为每个方法生成单独的文件名
@@ -158,7 +160,7 @@ def plot_calibration_charts(
                 f"self-consistency-{model_name.lower()}-{dataset_name.lower()}-{method_suffix}-recall-main.pdf"
             )
             output_path = os.path.join(output_dir, output_filename)
-            plt.savefig(output_path)
+            plt.savefig(output_path, bbox_inches="tight")
             print(f"Figure saved to: {output_path}")
 
         if show_fig:
@@ -173,7 +175,7 @@ def plot_calibration_charts(
 
 def _create_and_save_legend(color_map: dict, dataset_name: str, output_dir: str):
     """创建并保存单独的图例"""
-    fig_legend, ax_legend = plt.subplots(figsize=(5, 0.2))
+    fig_legend, ax_legend = plt.subplots(figsize=(4, 0.6))
     ax_legend.axis("off")
 
     # 重新创建图例项
@@ -198,7 +200,7 @@ def _create_and_save_legend(color_map: dict, dataset_name: str, output_dir: str)
     handles.append(Line2D([0], [0], linestyle="--", color="gray", label="Perfectly Calibrated"))
     labels.append("Perfectly Calibrated")
 
-    ax_legend.legend(handles, labels, loc="center", frameon=True, ncol=len(handles))
+    ax_legend.legend(handles, labels, loc="center", frameon=True, ncol=2)
 
     # 保存单独的图例
     legend_filename = f"self-consistency-{dataset_name.lower()}-recall-legend.pdf"

@@ -12,7 +12,7 @@ from confidence.logger import Logger
 from confidence.model import ModelName
 
 plt.rcParams["font.family"] = "Times New Roman"
-plt.rcParams["font.size"] = 10
+plt.rcParams["font.size"] = 15
 
 
 class Setting(BaseModel):
@@ -136,20 +136,22 @@ async def main():
         plt.ylabel("Recall")
         plt.xlim(0, 1)
         plt.ylim(0, 1)
-        plt.title(f"{model_series_name} on {dataset.name}")
+        plt.xticks(fontsize=13)
+        plt.yticks(fontsize=13)
+        plt.title(f"{model_series_name}", fontsize=15, pad=10)
         plt.grid(True)
         
         # 添加ECE值图例到右上角
         ece_legend_text = []
         for setting_name, ece_value, color in ece_legend_items:
-            ece_legend_text.append(f"{setting_name}: ECE={ece_value:.2f}%")
+            ece_legend_text.append(f"{setting_name}: {ece_value:.2f}%")
         
         # 在左上角添加文本框显示ECE值
         legend_text = '\n'.join(ece_legend_text)
         plt.text(0.05, 0.95, legend_text, transform=plt.gca().transAxes, 
                 verticalalignment='top', horizontalalignment='left',
                 bbox=dict(boxstyle='round', facecolor='white', alpha=0.8),
-                fontsize=9)
+                fontsize=13)
 
         plt.tight_layout()
 

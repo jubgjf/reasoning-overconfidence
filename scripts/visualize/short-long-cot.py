@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 plt.rcParams["font.family"] = "Times New Roman"
-plt.rcParams["font.size"] = 10
+plt.rcParams["font.size"] = 15
 
 
 def _create_and_save_legend(color_map):
@@ -94,25 +94,14 @@ if __name__ == "__main__":
 
     plt.xlabel("Model")
     plt.ylabel("Recall")
-    plt.title("Models on TimeTabling")
-    plt.xticks(x, models)
+    plt.title("TimeTabling", fontsize=15, pad=10)
+    plt.xticks(x, models, fontsize=13)
+    plt.yticks(fontsize=13)
     # 不添加图例到主图
     plt.grid(True, alpha=0.3, axis="y")
 
-    # 在柱子上添加数值标签
-    for bar in bars3:
-        height = bar.get_height()
-        plt.text(
-            bar.get_x() + bar.get_width() / 2.0, height + 0.2, f"{height:.1f}", ha="center", va="bottom", fontsize=8.5
-        )
-    for bar in bars4:
-        height = bar.get_height()
-        plt.text(
-            bar.get_x() + bar.get_width() / 2.0, height + 0.2, f"{height:.1f}", ha="center", va="bottom", fontsize=8.5
-        )
-
-    # 调整y轴上限以确保标签不被截断
-    plt.ylim(0, max(max(recall_long_cot) * 1.2, max(recall_short_cot)) * 1.2)
+    # 调整y轴上限
+    plt.ylim(0, max(max(recall_long_cot), max(recall_short_cot)) * 1.1)
 
     plt.tight_layout()
     plt.savefig("figures/short-long-cot-timetabling-recall-main.pdf", bbox_inches="tight")
@@ -150,25 +139,14 @@ if __name__ == "__main__":
 
     plt.xlabel("Model")
     plt.ylabel("Recall")
-    plt.title("Models on SubsetSum")
-    plt.xticks(x, models)
+    plt.title("SubsetSum", fontsize=15, pad=10)
+    plt.xticks(x, models, fontsize=13)
+    plt.yticks(fontsize=13)
     # 不添加图例到主图
     plt.grid(True, alpha=0.3, axis="y")
 
-    # 在柱子上添加数值标签
-    for bar in bars5:
-        height = bar.get_height()
-        plt.text(
-            bar.get_x() + bar.get_width() / 2.0, height + 0.5, f"{height:.1f}", ha="center", va="bottom", fontsize=8.5
-        )
-    for bar in bars6:
-        height = bar.get_height()
-        plt.text(
-            bar.get_x() + bar.get_width() / 2.0, height + 0.5, f"{height:.1f}", ha="center", va="bottom", fontsize=8.5
-        )
-
-    # 调整y轴上限以确保标签不被截断
-    plt.ylim(0, max(max(subsetsum_recall_long_cot) * 1.2, max(subsetsum_recall_short_cot)) * 1.2)
+    # 调整y轴上限
+    plt.ylim(0, max(max(subsetsum_recall_long_cot), max(subsetsum_recall_short_cot)) * 1.1)
 
     plt.tight_layout()
     plt.savefig("figures/short-long-cot-subsetsum-recall-main.pdf", bbox_inches="tight")

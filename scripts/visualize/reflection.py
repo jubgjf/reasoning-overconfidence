@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from matplotlib.lines import Line2D
 from scipy.stats import spearmanr
 from sklearn.linear_model import LinearRegression
 from tortoise import run_async
@@ -13,9 +14,8 @@ from confidence.evaluate import add_confidence_column, ece, prf
 from confidence.logger import Logger
 from confidence.model import ModelName
 
-
 plt.rcParams["font.family"] = "Times New Roman"
-plt.rcParams["font.size"] = 10
+plt.rcParams["font.size"] = 15
 
 
 def count_reflections(history_thinking_content: str) -> int:
@@ -130,16 +130,19 @@ async def main():
     # 为ECE单独过滤
     grouped_ece_filtered = grouped[grouped["ece_sample_count"] >= min_sample_threshold].copy()
 
-    plt.figure(figsize=(12, 3.2))
-    for i, metric in enumerate(["precision", "recall", "model_confidence_extracted", "ece"]):
+    for metric in ["precision", "recall", "model_confidence_extracted", "ece"]:
         if metric == "precision":
             ylabel = "Precision"
+            filename_suffix = "precision"
         elif metric == "recall":
             ylabel = "Recall"
+            filename_suffix = "recall"
         elif metric == "model_confidence_extracted":
             ylabel = "Confidence"
+            filename_suffix = "confidence"
         elif metric == "ece":
             ylabel = "ECE"
+            filename_suffix = "ece"
         else:
             raise ValueError(f"Unknown metric: {metric}")
 
@@ -162,7 +165,7 @@ async def main():
             p_value = 1.0
             significant = False
 
-        plt.subplot(1, 4, i + 1)
+        plt.figure(figsize=(3, 3))
 
         # 绘制数据点和连线（统一风格）
         sns.lineplot(
@@ -172,7 +175,6 @@ async def main():
             marker="o",
             markersize=6,
             linewidth=2,
-            label="Data",
         )
 
         # 线性拟合
@@ -193,22 +195,43 @@ async def main():
                 color="red",
                 alpha=0.7,
                 linewidth=2,
-                label=f"Fit: y={reg.coef_[0]:.3f}x+{reg.intercept_:.3f}",
             )
 
-        plt.xlabel("Normalized Reflection Times")
+        plt.xlabel("Norm. Reflection Times")
         plt.ylabel(ylabel)
-        plt.title(f"Corr: {corr:.2f}, p: {p_value:.2g}\n({'Significant' if significant else 'Not Significant'})")
-        plt.legend()
+        plt.xticks([0, 20, 40, 60], fontsize=13)
+        plt.yticks(fontsize=13)
+        plt.title(f"Corr: {corr:.2f}, p: {p_value:.2g}\n({'Significant' if significant else 'Not Significant'})", fontsize=15, pad=10)
 
-    plt.tight_layout()
-    plt.savefig(f"figures/reflection-{model.series_name.lower()}-{dataset}.pdf")
-    # plt.show()
+        plt.tight_layout()
+        plt.savefig(f"figures/reflection-{model.series_name.lower()}-{dataset}-{filename_suffix}-main.pdf", bbox_inches="tight")
+        plt.close()
+
+    # 创建并保存图例
+    _create_and_save_legend(dataset)
 
     # 打印过滤信息
     print(f"原始数据点数: {len(grouped)}")
     print(f"过滤后数据点数: {len(grouped_filtered)}")
     print(f"过滤掉的数据点占比: {(len(grouped) - len(grouped_filtered)) / len(grouped) * 100:.1f}%")
+
+
+def _create_and_save_legend(dataset):
+    """创建并保存单独的图例"""
+    fig_legend, ax_legend = plt.subplots(figsize=(4, 0.2))
+    ax_legend.axis("off")
+
+    # 创建图例项
+    handles = [
+        Line2D([0], [0], marker="o", color="tab:blue", linewidth=2, markersize=6, label="Data"),
+        Line2D([0], [0], linestyle="--", color="red", linewidth=2, alpha=0.7, label="Linear fit"),
+    ]
+    labels = ["Data", "Linear fit"]
+
+    ax_legend.legend(handles, labels, loc="center", frameon=True, ncol=2)
+
+    # 保存单独的图例
+    plt.savefig(f"figures/reflection-{dataset}-legend.pdf", bbox_inches="tight")
 
 
 if __name__ == "__main__":

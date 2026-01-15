@@ -12,7 +12,7 @@ from confidence.logger import Logger
 from confidence.model import ModelName
 
 plt.rcParams["font.family"] = "Times New Roman"
-plt.rcParams["font.size"] = 10
+plt.rcParams["font.size"] = 15
 
 
 class Setting(BaseModel):
@@ -74,7 +74,9 @@ async def main():
         sns.lineplot(data=df, x="answer_count_bin", y="recall", hue="setting")
         plt.xlabel("Complexity Level")
         plt.ylabel("Recall")
-        plt.title(f"{model_series_name} on {dataset.name}")
+        plt.xticks(ticks=range(0, 10, 2), fontsize=13)
+        plt.yticks(fontsize=13)
+        plt.title(f"{model_series_name}", fontsize=15, pad=10)
         plt.legend().remove()  # 移除图例
         plt.tight_layout()
         plt.savefig(f"figures/complexity-{model_series_name.lower()}-{dataset}-recall-main.pdf")
@@ -85,7 +87,9 @@ async def main():
         sns.lineplot(data=df, x="answer_count_bin", y="model_confidence_extracted", hue="setting")
         plt.xlabel("Complexity Level")
         plt.ylabel("Confidence")
-        plt.title(f"{model_series_name} on {dataset.name}")
+        plt.xticks(ticks=range(0, 10, 2), fontsize=13)
+        plt.yticks(fontsize=13)
+        plt.title(f"{model_series_name}", fontsize=15, pad=10)
         plt.legend().remove()  # 移除图例
         plt.tight_layout()
         plt.savefig(f"figures/complexity-{model_series_name.lower()}-{dataset}-confidence-main.pdf")

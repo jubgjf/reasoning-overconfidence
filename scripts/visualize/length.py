@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from matplotlib.lines import Line2D
 from scipy.stats import pearsonr
 from tortoise import run_async
 from transformers import AutoTokenizer
@@ -12,7 +13,7 @@ from confidence.logger import Logger
 from confidence.model import ModelName
 
 plt.rcParams["font.family"] = "Times New Roman"
-plt.rcParams["font.size"] = 10
+plt.rcParams["font.size"] = 15
 
 
 async def main():
@@ -59,7 +60,6 @@ async def main():
         marker="o",
         linewidth=2,
         markersize=6,
-        label="Binned data",
     )
 
     # 添加直线拟合 (在log空间中进行线性拟合)
@@ -87,7 +87,6 @@ async def main():
         "--",
         color="red",
         linewidth=2,
-        label="Log-linear fit",
     )
 
     plt.xscale("log")
@@ -97,23 +96,17 @@ async def main():
     # 计算合适的数量级范围
     log_min, log_max = np.log10(x_min), np.log10(x_max)
 
-    # 生成规律的刻度位置：1, 2, 5, 10, 20, 50, 100, ...
-    tick_positions = []
-    for exp in range(int(log_min), int(log_max) + 2):
-        for base in [2, 5]:
-            # for base in [1, 2, 5]:
-            tick_val = base * (10**exp)
-            if x_min <= tick_val <= x_max * 1.5:  # 稍微扩展范围以包含边界值
-                tick_positions.append(tick_val)
+    # 固定刻度位置：1×10^3, 5×10^3, 20×10^3
+    tick_positions = [1000, 5000, 20000]
+    tick_labels = ["1×10³", "5×10³", "20×10³"]
 
-    tick_positions = sorted(list(set(tick_positions)))  # 去重并排序
+    plt.xticks(tick_positions, tick_labels)
 
-    plt.xticks(tick_positions, [f"{x / 1000:.1f}×10³" if x >= 1000 else f"{int(x)}" for x in tick_positions])
-
-    plt.xlabel("Model Thinking Length (Tokens)")
-    plt.ylabel("Model Confidence")
-    plt.title(f"Corr: {corr_coefficient:.2f}, p: {p_value:.2g}\n({significant})")
-    plt.legend(loc="best")
+    plt.xlabel("Thinking Length (Tokens)")
+    plt.ylabel("Confidence")
+    plt.xticks(fontsize=13)
+    plt.yticks(fontsize=13)
+    plt.title(f"Corr: {corr_coefficient:.2f}, p: {p_value:.2g}\n({significant})", fontsize=15, pad=10)
 
     # 打印统计结果
     print(f"\nLinear correlation analysis:")
@@ -124,8 +117,30 @@ async def main():
     print(f"  Slope in log space: {coeffs[0]:.3f}")
 
     plt.tight_layout()
-    plt.savefig(f"figures/length-{model.series_name.lower()}-{dataset}.pdf")
+    # 保存无图例的主图
+    plt.savefig(f"figures/length-{model.series_name.lower()}-{dataset}-main.pdf", bbox_inches="tight")
     # plt.show()
+
+    # 创建并保存图例
+    _create_and_save_legend(dataset)
+
+
+def _create_and_save_legend(dataset):
+    """创建并保存单独的图例"""
+    fig_legend, ax_legend = plt.subplots(figsize=(4, 0.2))
+    ax_legend.axis("off")
+
+    # 创建图例项
+    handles = [
+        Line2D([0], [0], marker="o", color="tab:blue", linewidth=2, markersize=6, label="Binned data"),
+        Line2D([0], [0], linestyle="--", color="red", linewidth=2, label="Log-linear fit"),
+    ]
+    labels = ["Binned data", "Log-linear fit"]
+
+    ax_legend.legend(handles, labels, loc="center", frameon=True, ncol=2)
+
+    # 保存单独的图例
+    plt.savefig(f"figures/length-{dataset}-legend.pdf", bbox_inches="tight")
 
 
 if __name__ == "__main__":

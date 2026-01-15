@@ -4,30 +4,30 @@ from matplotlib import hatch
 from matplotlib.patches import Rectangle
 
 plt.rcParams["font.family"] = "Times New Roman"
-plt.rcParams["font.size"] = 10
+plt.rcParams["font.size"] = 15
 
 
 def _create_and_save_legend():
     """创建并保存单独的图例"""
-    fig_legend, ax_legend = plt.subplots(figsize=(4, 1.2))  # 恢复原来的高度1.2，保持宽度6
+    fig_legend, ax_legend = plt.subplots(figsize=(4, 0.9))
     ax_legend.axis("off")
 
     # 第一行：颜色对应的指标
-    metrics = ["Precision (↑)", "Recall (↑)", "ECE (↓)", "CSR (↑)       ", "ESC (↑)   ", "NSD (↑)"]
-    metric_colors = ["tab:blue", "tab:orange", "tab:green", "tab:red", "tab:purple", "tab:brown"]
+    metrics = ["Recall (↑)", "ECE (↓)", "ESC (↑)", "NSD (↑)"]
+    metric_colors = ["tab:orange", "tab:green", "tab:purple", "tab:brown"]
 
     handles_metrics = []
     labels_metrics = []
 
-    # 添加指标颜色（第一行）
+    # 添加指标颜色
     for metric, color in zip(metrics, metric_colors):
         handle = Rectangle(
             (0, 0), 1, 1, facecolor=color, edgecolor="black", linewidth=0.8, alpha=0.7
-        )  # 添加与主图一致的透明度
+        )
         handles_metrics.append(handle)
         labels_metrics.append(metric)
 
-    # 第二行：方法对应的花纹
+    # 方法对应的花纹
     handles_methods = []
     labels_methods = []
 
@@ -41,42 +41,19 @@ def _create_and_save_legend():
     handles_methods.append(handle2)
     labels_methods.append("w/ Exploration")
 
-    # 创建第一行图例（指标颜色）- 分成两行显示
-    # 第一行：前3个指标
-    legend1 = ax_legend.legend(
-        handles_metrics[:3],
-        labels_metrics[:3],
-        loc="upper center",
-        bbox_to_anchor=(0.5, 0.90),  # 第一行指标图例位置
-        frameon=True,
-        ncol=3,
-    )
+    # 合并所有 handles 和 labels
+    # matplotlib legend 按列填充，要实现：
+    # 第一行：Recall, ECE
+    # 第二行：ESC, NSD
+    # 第三行：Short-CoT, w/ Exploration
+    # 需要按列顺序排列：[Recall, ESC, Short-CoT, ECE, NSD, w/ Exploration]
+    all_handles = [handles_metrics[0], handles_metrics[2], handles_methods[0], 
+                   handles_metrics[1], handles_metrics[3], handles_methods[1]]
+    all_labels = [labels_metrics[0], labels_metrics[2], labels_methods[0],
+                  labels_metrics[1], labels_metrics[3], labels_methods[1]]
 
-    # 添加第一个图例到axes
-    ax_legend.add_artist(legend1)
-
-    # 第二行：后3个指标
-    legend2 = ax_legend.legend(
-        handles_metrics[3:],
-        labels_metrics[3:],
-        loc="upper center",
-        bbox_to_anchor=(0.5, 0.60),  # 第二行指标图例位置
-        frameon=True,
-        ncol=3,
-    )
-
-    # 添加第二个图例到axes
-    ax_legend.add_artist(legend2)
-
-    # 第三行图例（方法花纹）
-    legend3 = ax_legend.legend(
-        handles_methods,
-        labels_methods,
-        loc="upper center",
-        bbox_to_anchor=(0.5, 0.30),  # 调整方法图例位置
-        frameon=True,
-        ncol=2,
-    )
+    # 使用统一的 legend，ncol=2 实现三行显示（6个元素，每行2个）
+    ax_legend.legend(all_handles, all_labels, loc="center", frameon=True, ncol=2)
 
     # 保存单独的图例
     plt.savefig("figures/exploration-all-qwen-timetabling-legend.pdf", bbox_inches="tight")
@@ -86,14 +63,14 @@ def _create_and_save_legend():
 def _plot_dataset(dataset_name, short_cot_values, exploration_values, filename_prefix):
     """绘制单个数据集的柱状图"""
     # 准备数据进行绘图
-    metrics = ["Precision", "Recall", "ECE", "CSR", "ESC", "NSD"]
+    metrics = ["Recall", "ECE", "ESC", "NSD"]
     
     # 设置图形
     x = np.arange(len(metrics))
     width = 0.30  # 更细的柱子
 
     # 为每个指标设置相同的颜色
-    metric_colors = ["tab:blue", "tab:orange", "tab:green", "tab:red", "tab:purple", "tab:brown"]
+    metric_colors = ["tab:orange", "tab:green", "tab:purple", "tab:brown"]
 
     # 在创建图形之前设置花纹属性
     plt.rcParams["hatch.color"] = "white"
@@ -124,43 +101,15 @@ def _plot_dataset(dataset_name, short_cot_values, exploration_values, filename_p
     )
 
     plt.xlabel("Metrics")
-    plt.ylabel("Values (%)")
-    plt.title("Short-CoT vs w/ Exploration")
-    plt.xticks(x, metrics, fontsize=9, rotation=20, ha="right")
+    plt.ylabel("Values")
+    plt.title("w/ Exploration", fontsize=15, pad=10)
+    plt.xticks(x, metrics, fontsize=13)
+    plt.yticks(fontsize=13)
     # 不添加图例到主图
     plt.grid(True, alpha=0.5, axis="y")
 
-    # 在柱子上添加数值标签，手动调整位置避免重叠
-    if dataset_name == "TimeTabling":
-        label_offsets_short = [-0.13, -0.08, -0.15, -0.13, 0, -0.08]  # Short-CoT柱子标签的左右偏移量
-        label_offsets_exploration = [0, +0.08, +0.15, 0, +0.13, +0.08]  # w/ Exploration柱子标签的左右偏移量
-    else:  # SubsetSum
-        label_offsets_short = [-0.08, -0.08, -0.13, -0.08, 0, -0.08]  # Short-CoT柱子标签的左右偏移量
-        label_offsets_exploration = [+0.08, +0.08, +0.13, +0.08, +0.08, +0.08]  # w/ Exploration柱子标签的左右偏移量
-
-    for i, bar in enumerate(bars1):
-        height = bar.get_height()
-        plt.text(
-            bar.get_x() + bar.get_width() / 2.0 + label_offsets_short[i],  # 添加手动偏移
-            height + max(short_cot_values + exploration_values) * 0.01,
-            f"{height:.2f}" if height < 10 else f"{height:.1f}",
-            ha="center",
-            va="bottom",
-            fontsize=8,
-        )
-    for i, bar in enumerate(bars2):
-        height = bar.get_height()
-        plt.text(
-            bar.get_x() + bar.get_width() / 2.0 + label_offsets_exploration[i],  # 添加手动偏移
-            height + max(short_cot_values + exploration_values) * 0.01,
-            f"{height:.2f}" if height < 10 else f"{height:.1f}",
-            ha="center",
-            va="bottom",
-            fontsize=8,
-        )
-
-    # 调整y轴上限以确保标签不被截断
-    plt.ylim(0, max(short_cot_values + exploration_values) * 1.15)
+    # 固定 y 轴范围为 0-1
+    plt.ylim(0, 1.0)
 
     plt.tight_layout()
 
@@ -203,14 +152,14 @@ if __name__ == "__main__":
         "NSD (%)": [0.20, 0.00],
     }
 
-    # 绘制TimeTabling数据集
-    timetabling_short_cot = [37.25, 3.68, 95.51, 43.15, 65.22, 0.19]
-    timetabling_exploration = [61.31, 6.76, 93.59, 76.93, 39.47, 0.25]
+    # 绘制TimeTabling数据集 (转换为0-1范围)
+    timetabling_short_cot = [3.68 / 100, 95.51 / 100, 65.22 / 100, 1.00 / 100]
+    timetabling_exploration = [6.76 / 100, 93.59 / 100, 39.47 / 100, 1.50 / 100]
     _plot_dataset("TimeTabling", timetabling_short_cot, timetabling_exploration, "exploration-all-qwen-timetabling")
 
-    # 绘制SubsetSum数据集
-    subsetsum_short_cot = [4.51, 2.19, 56.44, 14.89, 15.63, 0.20]
-    subsetsum_exploration = [4.64, 2.21, 80.36, 16.35, 12.10, 0.00]
+    # 绘制SubsetSum数据集 (转换为0-1范围)
+    subsetsum_short_cot = [2.19 / 100, 56.44 / 100, 15.63 / 100, 1.00 / 100]
+    subsetsum_exploration = [2.21 / 100, 80.36 / 100, 12.10 / 100, 0.50 / 100]
     _plot_dataset("SubsetSum", subsetsum_short_cot, subsetsum_exploration, "exploration-all-qwen-subsetsum")
 
     # 创建并保存单独的图例

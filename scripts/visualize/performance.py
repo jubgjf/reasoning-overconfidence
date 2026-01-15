@@ -16,7 +16,7 @@ from confidence.logger import Logger
 from confidence.model import ModelName
 
 plt.rcParams["font.family"] = "Times New Roman"
-plt.rcParams["font.size"] = 10
+plt.rcParams["font.size"] = 15
 
 
 class Setting(BaseModel):
@@ -36,7 +36,7 @@ def _create_and_save_3d_legend(palette, region_color, dataset):
         Patch(facecolor=region_color, alpha=0.2, label="Overconfidence Region"),
     ]
 
-    ax_legend.legend(handles=legend_elements, loc="center", frameon=True, ncol=3)
+    ax_legend.legend(handles=legend_elements, loc="center", frameon=True, ncol=3, fontsize=15)
 
     # 保存单独的图例（移除模型名）
     plt.savefig(f"figures/performance-3d-{dataset}-recall-legend.pdf", bbox_inches="tight")
@@ -58,7 +58,7 @@ def _create_and_save_movement_legend(dataset):
         Line2D([0], [0], color="red", marker=">", markersize=8, alpha=1.0, label="Toward Calibration"),
     ]
 
-    ax_legend.legend(handles=legend_elements, loc="center", frameon=True, ncol=4)
+    ax_legend.legend(handles=legend_elements, loc="center", frameon=True, ncol=4, fontsize=15)
 
     # 保存单独的图例（移除模型名）
     plt.savefig(f"figures/performance-movement-{dataset}-recall-legend.pdf", bbox_inches="tight")
@@ -226,21 +226,26 @@ async def main():
         poly = Poly3DCollection(faces, alpha=0.2, facecolor=region_color, edgecolor=region_color, linewidth=1)
         ax.add_collection3d(poly)
 
-        ax.set_xlabel("Confidence")
-        ax.set_ylabel("Recall")
-        ax.set_zlabel("Density")
+        ax.set_xlabel("Confidence", fontsize=15)
+        ax.set_ylabel("Recall", fontsize=15)
+        ax.set_zlabel("Density", fontsize=15)
         ax.set_xlim(-0.05, 1.05)
         ax.set_ylim(-0.05, 1.05)
+
+        # 设置刻度标签字号
+        ax.tick_params(axis='x', labelsize=13)
+        ax.tick_params(axis='y', labelsize=13)
+        ax.tick_params(axis='z', labelsize=13)
 
         # 移除重复的导入（已在文件开头导入）
         # 不添加图例到3D主图
 
-        ax.set_title(f"{model_series_name} on {dataset.name}")
+        ax.set_title(f"{model_series_name}", fontsize=15, y=1.02)
 
         # 调整轴标签位置
         ax.xaxis.labelpad = 5
         ax.yaxis.labelpad = 5
-        ax.zaxis.labelpad = -150
+        ax.zaxis.labelpad = -147
 
         # 使用subplots_adjust而不是tight_layout
         plt.subplots_adjust(left=0.1, right=0.9, top=0.9, bottom=0.1)
@@ -344,12 +349,14 @@ async def main():
         # 移除重复的导入（已在文件开头导入）
         # 不添加图例到movement主图
 
-        plt.xlabel("Confidence")
-        plt.ylabel("Recall")
+        plt.xlabel("Confidence", fontsize=15)
+        plt.ylabel("Recall", fontsize=15)
+        plt.xticks(fontsize=13)
+        plt.yticks(fontsize=13)
         plt.xlim(x_min - 0.02, x_max + 0.02)
         plt.ylim(y_min - 0.02, y_max + 0.02)
         # 不添加图例到主图
-        plt.title(f"{model_series_name} on {dataset.name}")
+        plt.title(f"{model_series_name}", fontsize=15, pad=10)
         plt.tight_layout()
         plt.savefig(
             f"figures/performance-movement-{model_series_name.lower()}-{dataset}-recall-main.pdf", bbox_inches="tight"
