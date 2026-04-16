@@ -175,4 +175,5 @@ cython_debug/
 
 /logs/*
 !/logs/.gitkeep
+/logs-reproduce/
 /tmp/
