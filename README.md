@@ -121,5 +121,15 @@ We also provide a script `scripts/entropy.example.sh` for this.
 
 ## Reproducibility
 
-We have provided all the experimental logs from this paper in `logs-reproduce/`.
+We have provided all the experimental logs from this paper in [HuggingFace](https://huggingface.co/datasets/jubgjf/reasoning-overconfidence-logs-reproduce).
+
+```python
+from huggingface_hub import snapshot_download
+snapshot_download(
+    repo_id="jubgjf/reasoning-overconfidence-logs-reproduce",
+    repo_type="dataset",
+    local_dir="logs-reproduce/",
+)
+```
+
 You can directly use the visualization code to reproduce the results for all figures and tables in the paper.
